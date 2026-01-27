@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
+
+html {
+  font-family: 'Cairo', sans-serif;
+}
+
+body {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.dark::-webkit-scrollbar-track {
+  background: #1A1F26;
+}
+
+.dark::-webkit-scrollbar-thumb {
+  background: #444;
+}
+
+/* Verse animation */
+@keyframes verseHighlight {
+  0% {
+    background-color: rgba(45, 158, 111, 0.1);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.verse-highlight {
+  animation: verseHighlight 1s ease-out;
+}
+
+/* Page transition */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.page-transition {
+  animation: fadeIn 0.3s ease-in;
+}
