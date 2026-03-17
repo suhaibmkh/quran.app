@@ -11,6 +11,10 @@ interface SettingsModalProps {
   selectedTafsir: string;
   onReciterChange: (id: string) => void;
   onTafsirChange: (id: string) => void;
+  pinReciter?: boolean;
+  pinTafsir?: boolean;
+  onPinReciterChange?: (value: boolean) => void;
+  onPinTafsirChange?: (value: boolean) => void;
   fontSize: number;
   onFontSizeChange: (size: number) => void;
   readOnlyMushaf?: boolean;
@@ -23,11 +27,18 @@ export const SettingsModal = ({
   selectedTafsir,
   onReciterChange,
   onTafsirChange,
+  pinReciter = false,
+  pinTafsir = false,
+  onPinReciterChange,
+  onPinTafsirChange,
   fontSize,
   onFontSizeChange,
   readOnlyMushaf,
 }: SettingsModalProps) => {
   const { isDark } = useTheme();
+  const selectClass = `w-full rounded-lg px-3 py-3 outline-none border text-sm ${
+    isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'
+  }`;
 
   if (!isOpen) return null;
 
@@ -51,74 +62,80 @@ export const SettingsModal = ({
           </button>
         </div>
 
-        {!readOnlyMushaf && (
-          <>
-            {/* Reciter Selection */}
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-3">
-                <Volume2 size={20} className="text-quran-green" />
-                <label className="text-lg font-semibold">القارئ</label>
-              </div>
-              <div className="space-y-2">
-                {reciters.map((reciter) => (
-                  <button
-                    key={reciter.id}
-                    onClick={() => onReciterChange(reciter.id)}
-                    className={`w-full text-right px-4 py-3 rounded-lg transition-colors ${
-                      selectedReciter === reciter.id
-                        ? 'bg-quran-green text-white'
-                        : isDark
-                        ? 'bg-gray-700 hover:bg-gray-600'
-                        : 'bg-gray-100 hover:bg-gray-200'
-                    }`}
-                  >
-                    {reciter.name}
-                  </button>
-                ))}
-              </div>
-            </div>
+        {/* Reciter Selection */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Volume2 size={20} className="text-quran-green" />
+            <label className="text-lg font-semibold">القارئ</label>
+          </div>
+          <select
+            value={selectedReciter}
+            onChange={(e) => onReciterChange(e.target.value)}
+            className={selectClass}
+          >
+            {reciters.map((reciter) => (
+              <option key={reciter.id} value={reciter.id}>
+                {reciter.name}
+              </option>
+            ))}
+          </select>
+          <div className="mt-3">
+            <label className="text-sm mb-1 block">تثبيت القارئ</label>
+            <select
+              value={pinReciter ? '1' : '0'}
+              onChange={(e) => onPinReciterChange?.(e.target.value === '1')}
+              className={selectClass}
+            >
+              <option value="1">مفعّل</option>
+              <option value="0">غير مفعّل</option>
+            </select>
+          </div>
+        </div>
 
-            {/* Tafsir Selection */}
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-3">
-                <BookOpen size={20} className="text-quran-green" />
-                <label className="text-lg font-semibold">التفسير</label>
-              </div>
-              <div className="space-y-2">
-                {tafsirs.map((tafsir) => (
-                  <button
-                    key={tafsir.id}
-                    onClick={() => onTafsirChange(tafsir.id)}
-                    className={`w-full text-right px-4 py-3 rounded-lg transition-colors ${
-                      selectedTafsir === tafsir.id
-                        ? 'bg-quran-green text-white'
-                        : isDark
-                        ? 'bg-gray-700 hover:bg-gray-600'
-                        : 'bg-gray-100 hover:bg-gray-200'
-                    }`}
-                  >
-                    {tafsir.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
+        {/* Tafsir Selection */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <BookOpen size={20} className="text-quran-green" />
+            <label className="text-lg font-semibold">التفسير</label>
+          </div>
+          <select
+            value={selectedTafsir}
+            onChange={(e) => onTafsirChange(e.target.value)}
+            className={selectClass}
+          >
+            {tafsirs.map((tafsir) => (
+              <option key={tafsir.id} value={tafsir.id}>
+                {tafsir.name}
+              </option>
+            ))}
+          </select>
+          <div className="mt-3">
+            <label className="text-sm mb-1 block">تثبيت التفسير</label>
+            <select
+              value={pinTafsir ? '1' : '0'}
+              onChange={(e) => onPinTafsirChange?.(e.target.value === '1')}
+              className={selectClass}
+            >
+              <option value="1">مفعّل</option>
+              <option value="0">غير مفعّل</option>
+            </select>
+          </div>
+        </div>
 
         {/* Font Size */}
         <div className="mb-6">
           <label className="text-lg font-semibold block mb-3">حجم الخط</label>
-          <div className="flex items-center gap-4">
-            <input
-              type="range"
-              min="16"
-              max="28"
-              value={fontSize}
-              onChange={(e) => onFontSizeChange(Number(e.target.value))}
-              className="flex-1"
-            />
-            <span className="text-sm font-semibold min-w-12">{fontSize}px</span>
-          </div>
+          <select
+            value={String(fontSize)}
+            onChange={(e) => onFontSizeChange(Number(e.target.value))}
+            className={selectClass}
+          >
+            {[16, 18, 20, 22, 24, 26, 28].map((size) => (
+              <option key={size} value={size}>
+                {size}px
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Close Button */}

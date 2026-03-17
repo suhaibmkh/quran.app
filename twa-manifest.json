@@ -1,0 +1,54 @@
+{
+  "packageId": "app.vercel.quran_app_delta_six_ecru.twa",
+  "host": "quran-app-delta-six-ecru.vercel.app",
+  "name": "Quran",
+  "launcherName": "Quran",
+  "display": "standalone",
+  "themeColor": "#0B1220",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#0B1220",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://quran-app-delta-six-ecru.vercel.app/icons/icon-512.png",
+  "maskableIconUrl": "https://quran-app-delta-six-ecru.vercel.app/icons/icon-512-maskable.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "C:\\Users\\SUHAIB\\Desktop\\Devolpment\\Quran\\android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "1",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://quran-app-delta-six-ecru.vercel.app/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "playBilling": {
+      "enabled": true
+    },
+    "locationDelegation": {
+      "enabled": true
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://quran-app-delta-six-ecru.vercel.app/",
+  "minSdkVersion": 21,
+  "orientation": "default",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "",
+  "displayOverride": [],
+  "appVersion": "1"
+}
