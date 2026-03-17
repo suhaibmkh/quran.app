@@ -178,10 +178,9 @@ export function MushafPage({ ayahs, pageNumber, fontSize, onVersePress, highligh
             {group.startsFromVerse1 && (
               <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 2.2fr 1fr',
+                  display: 'flex',
+                  justifyContent: 'center',
                   alignItems: 'center',
-                  gap: 8,
                   margin: '14px 0 12px',
                   background: surahBannerBg,
                   border: `1px solid ${surahBannerBorder}`,
@@ -192,19 +191,6 @@ export function MushafPage({ ayahs, pageNumber, fontSize, onVersePress, highligh
               >
                 <div
                   style={{
-                    textAlign: 'right',
-                    color: isDark ? '#d8b95a' : '#6b4c0a',
-                    fontFamily: "'Cairo', sans-serif",
-                    fontSize: Math.max(13, fontSize - 8),
-                    fontWeight: 700,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  سورة {group.surahName}
-                </div>
-
-                <div
-                  style={{
                     textAlign: 'center',
                     fontSize: Math.max(20, fontSize - 2),
                     color: textColor,
@@ -213,21 +199,6 @@ export function MushafPage({ ayahs, pageNumber, fontSize, onVersePress, highligh
                   }}
                 >
                   {showDecorativeBasmalah ? `﴾ ${BASMALAH} ﴿` : '۞'}
-                </div>
-
-                <div
-                  style={{
-                    textAlign: 'left',
-                    color: mutedColor,
-                    fontFamily: "'Cairo', sans-serif",
-                    fontSize: Math.max(12, fontSize - 9),
-                    fontWeight: 700,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {surahVerseCounts?.[group.surahId]
-                    ? `${toArabicNumerals(surahVerseCounts[group.surahId])} آية`
-                    : ''}
                 </div>
               </div>
             )}
