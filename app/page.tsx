@@ -490,9 +490,11 @@ function QuranAppContent() {
     // Ignore vertical scroll gestures and short swipes.
     if (Math.abs(deltaX) < 45 || Math.abs(deltaX) < Math.abs(deltaY)) return;
 
-    if (deltaX < 0) {
+    if (deltaX > 0) {
+      // سحب من اليسار إلى اليمين → تقدّم للصفحة التالية
       setMushafPageNumber((p) => Math.min(604, p + 1));
     } else {
+      // سحب من اليمين إلى اليسار → رجوع للصفحة السابقة
       setMushafPageNumber((p) => Math.max(1, p - 1));
     }
   };
