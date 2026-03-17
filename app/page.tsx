@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, useEffect } from 'react';
+import { useMemo, useRef, useState, useEffect, type TouchEvent } from 'react';
 import { Header } from '@/components/Header';
 import { SettingsModal } from '@/components/SettingsModal';
 import { Verse } from '@/components/Verse';
@@ -94,6 +94,10 @@ function QuranAppContent() {
   const [autoLoading, setAutoLoading] = useState(false);
   const [autoError, setAutoError] = useState<string | null>(null);
   const [autoIndex, setAutoIndex] = useState<number>(-1);
+
+  // Touch swipe page navigation (mobile/tablet)
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
 
   // Mushaf listening mode (page-by-page with ayah highlight)
   const mushafAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -460,6 +464,36 @@ function QuranAppContent() {
     if (mushafAudioRef.current) {
       mushafAudioRef.current.pause();
       mushafAudioRef.current.currentTime = 0;
+    }
+  };
+
+  const handleMushafTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    const touch = event.changedTouches[0];
+    touchStartXRef.current = touch.clientX;
+    touchStartYRef.current = touch.clientY;
+  };
+
+  const handleMushafTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    if (!readOnlyMushaf) return;
+
+    const startX = touchStartXRef.current;
+    const startY = touchStartYRef.current;
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+
+    if (startX === null || startY === null) return;
+
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - startX;
+    const deltaY = touch.clientY - startY;
+
+    // Ignore vertical scroll gestures and short swipes.
+    if (Math.abs(deltaX) < 45 || Math.abs(deltaX) < Math.abs(deltaY)) return;
+
+    if (deltaX < 0) {
+      setMushafPageNumber((p) => Math.min(604, p + 1));
+    } else {
+      setMushafPageNumber((p) => Math.max(1, p - 1));
     }
   };
 
@@ -867,17 +901,23 @@ function QuranAppContent() {
                   </div>
                 </div>
               ) : (
-                <MushafPage
-                  ayahs={pageVersesCache[mushafPageNumber] ?? []}
-                  pageNumber={mushafPageNumber}
-                  fontSize={fontSize + 8}
-                  surahVerseCounts={surahVerseCounts}
-                  highlightedAyahNumber={mushafHighlightedAyahNumber}
-                  onVersePress={(ayah) => {
-                    setActiveVerse(ayah);
-                    setVerseModalOpen(true);
-                  }}
-                />
+                <div
+                  onTouchStart={handleMushafTouchStart}
+                  onTouchEnd={handleMushafTouchEnd}
+                  style={{ touchAction: 'pan-y' }}
+                >
+                  <MushafPage
+                    ayahs={pageVersesCache[mushafPageNumber] ?? []}
+                    pageNumber={mushafPageNumber}
+                    fontSize={fontSize + 8}
+                    surahVerseCounts={surahVerseCounts}
+                    highlightedAyahNumber={mushafHighlightedAyahNumber}
+                    onVersePress={(ayah) => {
+                      setActiveVerse(ayah);
+                      setVerseModalOpen(true);
+                    }}
+                  />
+                </div>
               )
             ) : browseMode === 'surah' && chaptersLoading ? (
               <div className={`rounded-lg p-6 ${isDark ? 'bg-dark-card' : 'bg-light-card'}`}>
