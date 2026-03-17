@@ -6,6 +6,7 @@ import { useTheme } from '@/context/ThemeContext';
 import type { Ayah } from '@/lib/alQuranCloud';
 import { fetchAyahAudioUrl, fetchAyahTafsirText } from '@/lib/alQuranCloud';
 import type { Reciter, Tafsir } from '@/data/quran';
+import { formatSurahLabel } from '@/lib/surahName';
 
 const UNSUPPORTED_RECITER_IDENTIFIERS = new Set<string>([
   // Not available as an audio edition on alquran.cloud (as of Jan 2026)
@@ -166,11 +167,11 @@ export function VerseModal({
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
-        className={`${containerClass} rounded-xl w-full max-w-3xl shadow-xl overflow-hidden`}
+        className={`${containerClass} rounded-xl w-full max-w-3xl max-h-[92vh] shadow-xl overflow-hidden flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className={`sticky top-0 z-10 flex-shrink-0 flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-gray-700 bg-dark-card' : 'border-gray-200 bg-white'}`}>
           <div className="flex items-center gap-3">
             <button
               onClick={() => prevVerse && onVerseChange(prevVerse)}
@@ -207,7 +208,7 @@ export function VerseModal({
             </button>
 
             <div>
-            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>سورة {effectiveSurahName}</p>
+            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{formatSurahLabel(effectiveSurahName)}</p>
             <h3 className="text-lg font-bold">الآية ﴿{verse.numberInSurah}﴾</h3>
           </div>
           </div>
@@ -231,7 +232,7 @@ export function VerseModal({
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-5">
+        <div className="p-5 space-y-5 overflow-y-auto flex-1 min-h-0">
           <div className={`${isDark ? 'bg-gray-800/40' : 'bg-gray-50'} rounded-lg p-4`}
                style={{ fontSize }}>
             <p className="leading-relaxed text-right">{verse.text}</p>
@@ -331,7 +332,7 @@ export function VerseModal({
         </div>
 
         {/* Footer */}
-        <div className={`px-5 py-4 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'} flex justify-end`}>
+        <div className={`sticky bottom-0 z-10 flex-shrink-0 px-5 py-4 border-t ${isDark ? 'border-gray-700 bg-dark-card' : 'border-gray-200 bg-white'} flex justify-end`}>
           <button
             onClick={onClose}
             className={`${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-800'} px-4 py-2 rounded-lg font-semibold transition-colors`}

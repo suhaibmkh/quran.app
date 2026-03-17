@@ -12,8 +12,10 @@ import { reciters, tafsirs } from '@/data/quran';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { VerseModal } from '@/components/VerseModal';
 import { MushafPage } from '@/components/MushafPage';
+import type { MushafFontMode } from '@/components/SettingsModal';
 import type { Ayah, SurahSummary } from '@/lib/alQuranCloud';
 import { fetchAyahAudioUrl, fetchJuzAyahs, fetchPageAyahs, fetchSurahAyahs, fetchSurahs } from '@/lib/alQuranCloud';
+import { formatSurahLabel, normalizeSurahName } from '@/lib/surahName';
 
 const VERSES_PER_PAGE = 10;
 
@@ -33,10 +35,9 @@ type ReadingBookmark =
     };
 
 const BOOKMARK_STORAGE_KEY = 'quran:lastBookmark:v1';
-const PIN_RECITER_KEY = 'quran:pinReciter:v1';
-const PIN_TAFSIR_KEY = 'quran:pinTafsir:v1';
-const FIXED_RECITER_KEY = 'quran:fixedReciter:v1';
-const FIXED_TAFSIR_KEY = 'quran:fixedTafsir:v1';
+const SELECTED_RECITER_KEY = 'quran:fixedReciter:v1';
+const SELECTED_TAFSIR_KEY = 'quran:fixedTafsir:v1';
+const MUSHAF_FONT_MODE_KEY = 'quran:mushafFontMode:v1';
 
 const UNSUPPORTED_RECITER_IDENTIFIERS = new Set<string>([
   'ar.muhammadimran',
@@ -72,12 +73,11 @@ function QuranAppContent() {
 
   const [selectedReciter, setSelectedReciter] = useState<string>(reciters[0]?.identifier ?? 'ar.alafasy');
   const [selectedTafsir, setSelectedTafsir] = useState<string>(tafsirs[0]?.identifier ?? 'ar.muyassar');
-  const [pinReciter, setPinReciter] = useState(true);
-  const [pinTafsir, setPinTafsir] = useState(true);
 
   const [fontSize, setFontSize] = useState(() =>
     typeof window !== 'undefined' && window.innerWidth < 768 ? 20 : 22
   );
+  const [mushafFontMode, setMushafFontMode] = useState<MushafFontMode>('madinah-local');
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [surahVersesCache, setSurahVersesCache] = useState<Record<number, Ayah[]>>({});
@@ -143,26 +143,48 @@ function QuranAppContent() {
 
   useEffect(() => {
     try {
-      const savedPinReciter = window.localStorage.getItem(PIN_RECITER_KEY);
-      const savedPinTafsir = window.localStorage.getItem(PIN_TAFSIR_KEY);
-      const shouldPinReciter = savedPinReciter !== '0';
-      const shouldPinTafsir = savedPinTafsir !== '0';
-
-      setPinReciter(shouldPinReciter);
-      setPinTafsir(shouldPinTafsir);
-
-      if (shouldPinReciter) {
-        const savedReciter = window.localStorage.getItem(FIXED_RECITER_KEY);
-        if (savedReciter && reciters.some((r) => r.id === savedReciter)) {
-          setSelectedReciter(savedReciter);
-        }
+      const savedReciter = window.localStorage.getItem(SELECTED_RECITER_KEY);
+      if (savedReciter && reciters.some((r) => r.id === savedReciter)) {
+        setSelectedReciter(savedReciter);
       }
 
-      if (shouldPinTafsir) {
-        const savedTafsir = window.localStorage.getItem(FIXED_TAFSIR_KEY);
-        if (savedTafsir && tafsirs.some((t) => t.id === savedTafsir)) {
-          setSelectedTafsir(savedTafsir);
-        }
+      const savedTafsir = window.localStorage.getItem(SELECTED_TAFSIR_KEY);
+      if (savedTafsir && tafsirs.some((t) => t.id === savedTafsir)) {
+        setSelectedTafsir(savedTafsir);
+      }
+
+      // Cleanup old pin-toggle flags after removing those settings.
+      window.localStorage.removeItem('quran:pinReciter:v1');
+      window.localStorage.removeItem('quran:pinTafsir:v1');
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SELECTED_RECITER_KEY, selectedReciter);
+    } catch {
+      // ignore
+    }
+  }, [selectedReciter]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SELECTED_TAFSIR_KEY, selectedTafsir);
+    } catch {
+      // ignore
+    }
+  }, [selectedTafsir]);
+
+  useEffect(() => {
+    try {
+      const savedMushafFontMode = window.localStorage.getItem(MUSHAF_FONT_MODE_KEY);
+      if (savedMushafFontMode === 'default' || savedMushafFontMode === 'madinah-local') {
+        setMushafFontMode(savedMushafFontMode);
+      } else if (savedMushafFontMode === 'madinah' || savedMushafFontMode === 'madinah-qurancom') {
+        // Migrate removed/old options to local Madinah font.
+        setMushafFontMode('madinah-local');
       }
     } catch {
       // ignore
@@ -171,25 +193,11 @@ function QuranAppContent() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(PIN_RECITER_KEY, pinReciter ? '1' : '0');
-      if (pinReciter) {
-        window.localStorage.setItem(FIXED_RECITER_KEY, selectedReciter);
-      }
+      window.localStorage.setItem(MUSHAF_FONT_MODE_KEY, mushafFontMode);
     } catch {
       // ignore
     }
-  }, [pinReciter, selectedReciter]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(PIN_TAFSIR_KEY, pinTafsir ? '1' : '0');
-      if (pinTafsir) {
-        window.localStorage.setItem(FIXED_TAFSIR_KEY, selectedTafsir);
-      }
-    } catch {
-      // ignore
-    }
-  }, [pinTafsir, selectedTafsir]);
+  }, [mushafFontMode]);
 
   // Fetch chapters once
   useEffect(() => {
@@ -343,21 +351,46 @@ function QuranAppContent() {
     const found = verses.find((v) => v.numberInSurah === pendingOpenAyah.ayahNumberInSurah);
     if (!found) return;
 
+    if (readOnlyMushaf) {
+      if (found.page) {
+        setMushafPageNumber(found.page);
+      }
+      setPendingOpenAyah(null);
+      return;
+    }
+
     setActiveVerse(found);
     setVerseModalOpen(true);
     setPendingOpenAyah(null);
-  }, [pendingOpenAyah, browseMode, selectedSurah?.id, verses]);
+  }, [pendingOpenAyah, browseMode, selectedSurah?.id, verses, readOnlyMushaf]);
 
   const headerTitle =
-    browseMode === 'surah'
-      ? {
+    (() => {
+      if (readOnlyMushaf) {
+        const pageAyahs = pageVersesCache[mushafPageNumber] ?? [];
+        const surahAtPageStart = pageAyahs.find((v) => v.numberInSurah === 1 && v.surahName);
+        const pageSurahName = normalizeSurahName(
+          surahAtPageStart?.surahName ?? pageAyahs[0]?.surahName ?? ''
+        );
+
+        return {
+          name: pageSurahName ? formatSurahLabel(pageSurahName) : `الصفحة ${mushafPageNumber}`,
+          englishName: `Page ${mushafPageNumber}`,
+        };
+      }
+
+      if (browseMode === 'surah') {
+        return {
           name: selectedSurah?.name ?? 'القرآن الكريم',
           englishName: selectedSurah?.englishName ?? '',
-        }
-      : {
-          name: `الجزء ${selectedJuz}`,
-          englishName: `Juz ${selectedJuz}`,
         };
+      }
+
+      return {
+        name: `الجزء ${selectedJuz}`,
+        englishName: `Juz ${selectedJuz}`,
+      };
+    })();
 
   const versesTotalPages = Math.max(1, Math.ceil(verses.length / VERSES_PER_PAGE));
   const startIndex = (verseListPage - 1) * VERSES_PER_PAGE;
@@ -467,6 +500,36 @@ function QuranAppContent() {
     }
   };
 
+  const handleChapterSelect = async (chapterId: number) => {
+    setSelectedChapter(chapterId);
+    setBrowseMode('surah');
+    setReadOnlyMushaf(true);
+    setSidebarOpen(false);
+    stopAutoPlay();
+    stopMushafListening();
+
+    let chapterAyahs = surahVersesCache[chapterId];
+    if (!chapterAyahs) {
+      setVersesLoading(true);
+      setVersesError(null);
+      try {
+        chapterAyahs = await fetchSurahAyahs(chapterId);
+        setSurahVersesCache((prev) => ({ ...prev, [chapterId]: chapterAyahs ?? [] }));
+      } catch (err) {
+        setVersesError(err instanceof Error ? err.message : 'تعذّر تحميل الآيات');
+        setVersesLoading(false);
+        return;
+      } finally {
+        setVersesLoading(false);
+      }
+    }
+
+    const firstPage = chapterAyahs?.find((a) => typeof a.page === 'number')?.page;
+    if (firstPage) {
+      setMushafPageNumber(firstPage);
+    }
+  };
+
   const handleMushafTouchStart = (event: TouchEvent<HTMLDivElement>) => {
     const touch = event.changedTouches[0];
     touchStartXRef.current = touch.clientX;
@@ -534,8 +597,7 @@ function QuranAppContent() {
       return;
     }
 
-    const currentHighlighted = pageAyahs.find((a) => a.number === mushafHighlightedAyahNumber);
-    await playMushafAyah(currentHighlighted ?? pageAyahs[0]);
+    await playMushafAyah(pageAyahs[0]);
   };
 
   const handleMushafAudioEnded = async () => {
@@ -599,13 +661,11 @@ function QuranAppContent() {
         selectedTafsir={selectedTafsir}
         onReciterChange={setSelectedReciter}
         onTafsirChange={setSelectedTafsir}
-        pinReciter={pinReciter}
-        pinTafsir={pinTafsir}
-        onPinReciterChange={setPinReciter}
-        onPinTafsirChange={setPinTafsir}
         fontSize={fontSize}
         onFontSizeChange={setFontSize}
         readOnlyMushaf={readOnlyMushaf}
+        mushafFontMode={mushafFontMode}
+        onMushafFontModeChange={setMushafFontMode}
       />
 
       {/* Body: sidebar + main */}
@@ -649,7 +709,7 @@ function QuranAppContent() {
                 <p className="text-xs mb-2">
                   {bookmark.kind === 'page'
                     ? `صفحة ${bookmark.pageNumber}`
-                    : `${bookmark.surahName ? `سورة ${bookmark.surahName} ` : ''}آية ﴿${bookmark.ayahNumberInSurah}﴾`}
+                    : `${bookmark.surahName ? `${formatSurahLabel(bookmark.surahName)} ` : ''}آية ﴿${bookmark.ayahNumberInSurah}﴾`}
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -663,7 +723,13 @@ function QuranAppContent() {
                         stopAutoPlay();
                       } else {
                         setReadOnlyMushaf(true);
-                        setMushafPageNumber(1);
+                        setBrowseMode('surah');
+                        setSelectedChapter(bookmark.surahId);
+                        setSelectedJuz(1);
+                        setPendingOpenAyah({
+                          surahId: bookmark.surahId,
+                          ayahNumberInSurah: bookmark.ayahNumberInSurah,
+                        });
                       }
                       setSidebarOpen(false);
                     }}
@@ -696,7 +762,9 @@ function QuranAppContent() {
               }}
               chapters={chapters}
               selectedChapter={selectedChapter}
-              onChapterSelect={(c) => { setSelectedChapter(c); setSidebarOpen(false); }}
+              onChapterSelect={(c) => {
+                void handleChapterSelect(c);
+              }}
               selectedJuz={selectedJuz}
               onJuzSelect={(j) => { setSelectedJuz(j); setSidebarOpen(false); }}
             />
@@ -904,6 +972,11 @@ function QuranAppContent() {
                 </div>
               ) : (
                 <div
+                  className={
+                    mushafFontMode === 'madinah-local'
+                      ? 'font-mode-madinah-local'
+                      : 'font-mode-default'
+                  }
                   onTouchStart={handleMushafTouchStart}
                   onTouchEnd={handleMushafTouchEnd}
                   style={{ touchAction: 'pan-y' }}

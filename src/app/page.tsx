@@ -13,6 +13,7 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import { VerseModal } from '@/components/VerseModal';
 import type { Ayah, SurahSummary } from '@/lib/alQuranCloud';
 import { fetchAyahAudioUrl, fetchJuzAyahs, fetchPageAyahs, fetchSurahAyahs, fetchSurahs } from '@/lib/alQuranCloud';
+import { formatSurahLabel, normalizeSurahName } from '@/lib/surahName';
 
 const VERSES_PER_PAGE = 10;
 
@@ -200,7 +201,7 @@ function QuranAppContent() {
       autoAudioRef.current.pause();
       autoAudioRef.current.currentTime = 0;
     }
-  }, [browseMode, selectedChapter, selectedJuz]);
+  }, [browseMode, selectedChapter, selectedJuz, readOnlyMushaf, mushafPageNumber]);
 
   // Fetch verses for the current selection (with caching)
   useEffect(() => {
@@ -276,16 +277,20 @@ function QuranAppContent() {
     setPendingOpenAyah(null);
   }, [pendingOpenAyah, browseMode, selectedSurah?.id, verses]);
 
-  const headerTitle =
-    browseMode === 'surah'
-      ? {
-          name: selectedSurah?.name ?? 'القرآن الكريم',
-          englishName: selectedSurah?.englishName ?? '',
-        }
-      : {
-          name: `الجزء ${selectedJuz}`,
-          englishName: `Juz ${selectedJuz}`,
-        };
+  const headerTitle = readOnlyMushaf
+    ? {
+        name: formattedPageSurahLabel || `الصفحة ${mushafPageNumber}`,
+        englishName: `Page ${mushafPageNumber}`,
+      }
+    : browseMode === 'surah'
+    ? {
+        name: selectedSurah?.name ?? 'القرآن الكريم',
+        englishName: selectedSurah?.englishName ?? '',
+      }
+    : {
+        name: `الجزء ${selectedJuz}`,
+        englishName: `Juz ${selectedJuz}`,
+      };
 
   const versesTotalPages = Math.max(1, Math.ceil(verses.length / VERSES_PER_PAGE));
   const startIndex = (verseListPage - 1) * VERSES_PER_PAGE;
@@ -311,16 +316,26 @@ function QuranAppContent() {
       ? mushafPages.pageMap.get(activeMushafPageNumber) ?? []
       : [];
 
-  const highlightedAyahNumber = autoIndex >= 0 ? verses[autoIndex]?.number : null;
+  const currentPageAyahs = pageVersesCache[mushafPageNumber] ?? [];
+  const pageTitleSurahName = useMemo(() => {
+    if (!currentPageAyahs.length) return '';
+    const surahStartOnPage = currentPageAyahs.find((v) => v.numberInSurah === 1 && v.surahName);
+    return normalizeSurahName(surahStartOnPage?.surahName ?? currentPageAyahs[0]?.surahName ?? '');
+  }, [currentPageAyahs]);
+  const formattedPageSurahLabel = pageTitleSurahName ? formatSurahLabel(pageTitleSurahName) : '';
+
+  const playbackVerses = readOnlyMushaf ? currentPageAyahs : verses;
+  const highlightedAyahGlobalNumber = autoIndex >= 0 ? playbackVerses[autoIndex]?.number : null;
 
   // Keep the playing ayah visible by updating pagination page
   useEffect(() => {
+    if (readOnlyMushaf) return;
     if (autoIndex < 0) return;
     const desiredPage = Math.floor(autoIndex / VERSES_PER_PAGE) + 1;
     if (desiredPage !== verseListPage) {
       setVerseListPage(desiredPage);
     }
-  }, [autoIndex, verseListPage]);
+  }, [autoIndex, verseListPage, readOnlyMushaf]);
 
   // If mushaf page mode is active, keep the page number in range
   useEffect(() => {
@@ -333,7 +348,7 @@ function QuranAppContent() {
   }, [readOnlyMushaf]);
 
   const playAtIndex = async (index: number) => {
-    const ayah = verses[index];
+    const ayah = playbackVerses[index];
     if (!ayah) return;
     const audioEl = autoAudioRef.current;
     if (!audioEl) return;
@@ -363,16 +378,46 @@ function QuranAppContent() {
   };
 
   const startAutoPlay = async () => {
-    if (!verses.length) return;
+    if (!playbackVerses.length) return;
     await playAtIndex(0);
   };
 
   const stopAutoPlay = () => {
     setAutoPlaying(false);
     setAutoLoading(false);
+    setAutoIndex(-1);
     if (autoAudioRef.current) {
       autoAudioRef.current.pause();
       autoAudioRef.current.currentTime = 0;
+    }
+  };
+
+  const handleChapterSelect = async (chapterId: number) => {
+    setSelectedChapter(chapterId);
+    setBrowseMode('surah');
+    setSelectedJuz(1);
+    stopAutoPlay();
+
+    let chapterAyahs = surahVersesCache[chapterId];
+    if (!chapterAyahs) {
+      setVersesLoading(true);
+      setVersesError(null);
+      try {
+        chapterAyahs = await fetchSurahAyahs(chapterId);
+        setSurahVersesCache((prev) => ({ ...prev, [chapterId]: chapterAyahs ?? [] }));
+      } catch (err) {
+        setVersesError(err instanceof Error ? err.message : 'تعذّر تحميل الآيات');
+        setVersesLoading(false);
+        return;
+      } finally {
+        setVersesLoading(false);
+      }
+    }
+
+    const firstPage = chapterAyahs?.find((a) => typeof a.page === 'number')?.page;
+    if (firstPage) {
+      setReadOnlyMushaf(true);
+      setMushafPageNumber(firstPage);
     }
   };
 
@@ -421,7 +466,7 @@ function QuranAppContent() {
                 <span className="font-bold">آخر موضع:</span>{' '}
                 {bookmark.kind === 'page'
                   ? `صفحة ${bookmark.pageNumber}`
-                  : `${bookmark.surahName ? `سورة ${bookmark.surahName} ` : ''}آية ﴿${bookmark.ayahNumberInSurah}﴾`}
+                  : `${bookmark.surahName ? `${formatSurahLabel(bookmark.surahName)} ` : ''}آية ﴿${bookmark.ayahNumberInSurah}﴾`}
               </div>
 
               <div className="flex items-center gap-2">
@@ -491,7 +536,9 @@ function QuranAppContent() {
               }}
               chapters={chapters}
               selectedChapter={selectedChapter}
-              onChapterSelect={setSelectedChapter}
+              onChapterSelect={(chapterId) => {
+                void handleChapterSelect(chapterId);
+              }}
               selectedJuz={selectedJuz}
               onJuzSelect={setSelectedJuz}
             />
@@ -528,6 +575,71 @@ function QuranAppContent() {
                   </div>
                 ) : (
                   <>
+                    <div className={`mb-4 rounded-lg p-4 border ${isDark ? 'border-gray-700 bg-dark-card' : 'border-gray-200 bg-light-card'}`}>
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                          <p className="font-bold">
+                            {readOnlyMushaf
+                              ? 'تشغيل الصفحة تلقائياً'
+                              : browseMode === 'surah'
+                              ? 'تشغيل السورة تلقائياً'
+                              : 'تشغيل الجزء تلقائياً'}
+                          </p>
+                          <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {readOnlyMushaf
+                              ? 'يبدأ التشغيل من أول آية في الصفحة المعروضة'
+                              : 'سيتم تمييز الآية المقروءة تلقائياً'}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {!autoPlaying ? (
+                            <button
+                              onClick={startAutoPlay}
+                              disabled={autoLoading || playbackVerses.length === 0}
+                              className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                                autoLoading || playbackVerses.length === 0
+                                  ? isDark
+                                    ? 'bg-gray-800 text-gray-400 cursor-not-allowed'
+                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                  : 'bg-quran-green text-white hover:bg-green-700'
+                              }`}
+                            >
+                              {autoLoading ? 'جاري التحضير...' : 'تشغيل'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={stopAutoPlay}
+                              className={`${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-800'} px-4 py-2 rounded-lg font-semibold transition-colors`}
+                            >
+                              إيقاف
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {autoError && <div className="mt-3 text-sm text-red-500">{autoError}</div>}
+
+                      <audio
+                        ref={autoAudioRef}
+                        className="hidden"
+                        onError={() => {
+                          setAutoPlaying(false);
+                          setAutoLoading(false);
+                          setAutoError('تعذّر تحميل الصوت لهذا القارئ (قد لا يكون مدعوماً)');
+                          stopAutoPlay();
+                        }}
+                        onEnded={() => {
+                          const next = autoIndex + 1;
+                          if (next < playbackVerses.length) {
+                            playAtIndex(next);
+                          } else {
+                            stopAutoPlay();
+                          }
+                        }}
+                      />
+                    </div>
+
                     {readOnlyMushaf ? (
                       <>
                         <div
@@ -616,11 +728,7 @@ function QuranAppContent() {
                               } border rounded-md p-6 md:p-10`}
                             >
                               <div className="flex items-center justify-between text-xs mb-4">
-                                <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>
-                                  {pageVersesCache[mushafPageNumber]?.[0]?.surahName
-                                    ? `سورة ${pageVersesCache[mushafPageNumber]?.[0]?.surahName}`
-                                    : ''}
-                                </span>
+                                <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>{formattedPageSurahLabel}</span>
                                 <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>
                                   صفحة {mushafPageNumber}
                                 </span>
@@ -635,9 +743,11 @@ function QuranAppContent() {
                                   textJustify: 'inter-word',
                                 }}
                               >
-                                {(pageVersesCache[mushafPageNumber] ?? []).map((v) => (
+                                {currentPageAyahs.map((v) => (
                                   <span key={v.number}>
-                                    {v.text}{' '}
+                                    <span className={highlightedAyahGlobalNumber === v.number ? 'bg-quran-green/10 rounded px-1' : ''}>
+                                      {v.text}
+                                    </span>{' '}
                                     <span className="text-quran-green">﴿{v.numberInSurah}﴾</span>{' '}
                                   </span>
                                 ))}
@@ -648,70 +758,13 @@ function QuranAppContent() {
                       </>
                     ) : (
                       <>
-                        <div className={`mb-4 rounded-lg p-4 border ${isDark ? 'border-gray-700 bg-dark-card' : 'border-gray-200 bg-light-card'}`}>
-                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                            <div>
-                              <p className="font-bold">{browseMode === 'surah' ? 'تشغيل السورة تلقائياً' : 'تشغيل الجزء تلقائياً'}</p>
-                              <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                سيتم تمييز الآية المقروءة تلقائياً
-                              </p>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              {!autoPlaying ? (
-                                <button
-                                  onClick={startAutoPlay}
-                                  disabled={autoLoading || verses.length === 0}
-                                  className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-                                    autoLoading || verses.length === 0
-                                      ? isDark
-                                        ? 'bg-gray-800 text-gray-400 cursor-not-allowed'
-                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                      : 'bg-quran-green text-white hover:bg-green-700'
-                                  }`}
-                                >
-                                  {autoLoading ? 'جاري التحضير...' : 'تشغيل'}
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={stopAutoPlay}
-                                  className={`${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-800'} px-4 py-2 rounded-lg font-semibold transition-colors`}
-                                >
-                                  إيقاف
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {autoError && <div className="mt-3 text-sm text-red-500">{autoError}</div>}
-
-                          <audio
-                            ref={autoAudioRef}
-                            className="hidden"
-                            onError={() => {
-                              setAutoPlaying(false);
-                              setAutoLoading(false);
-                              setAutoError('تعذّر تحميل الصوت لهذا القارئ (قد لا يكون مدعوماً)');
-                              stopAutoPlay();
-                            }}
-                            onEnded={() => {
-                              const next = autoIndex + 1;
-                              if (next < verses.length) {
-                                playAtIndex(next);
-                              } else {
-                                stopAutoPlay();
-                              }
-                            }}
-                          />
-                        </div>
-
                         <div className="page-transition">
                           {paginatedVerses.map((verse) => (
                             <Verse
                               key={verse.number}
                               verse={verse}
                               fontSize={fontSize}
-                              isHighlighted={highlightedAyahNumber === verse.number}
+                              isHighlighted={highlightedAyahGlobalNumber === verse.number}
                               onOpen={() => {
                                 setActiveVerse(verse);
                                 setVerseModalOpen(true);

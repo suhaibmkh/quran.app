@@ -3,6 +3,7 @@
 import { useTheme } from '@/context/ThemeContext';
 import { Play, BookOpen } from 'lucide-react';
 import type { Ayah } from '@/lib/alQuranCloud';
+import { formatSurahLabel } from '@/lib/surahName';
 
 interface VerseComponentProps {
   verse: Ayah;
@@ -35,7 +36,7 @@ export const Verse = ({
         <div className="flex-1 text-right">
           <p className="leading-relaxed" style={{ fontSize }}>{verse.text}</p>
           <p className={`text-sm mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-            {verse.surahName ? `سورة ${verse.surahName} • ` : ''}﴿{verse.numberInSurah}﴾
+            {verse.surahName ? `${formatSurahLabel(verse.surahName)} • ` : ''}﴿{verse.numberInSurah}﴾
           </p>
         </div>
 

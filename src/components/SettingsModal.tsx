@@ -4,6 +4,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { reciters, tafsirs } from '@/data/quran';
 import { X, Volume2, BookOpen } from 'lucide-react';
 
+export type MushafFontMode = 'default' | 'madinah-local';
+
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -11,13 +13,11 @@ interface SettingsModalProps {
   selectedTafsir: string;
   onReciterChange: (id: string) => void;
   onTafsirChange: (id: string) => void;
-  pinReciter?: boolean;
-  pinTafsir?: boolean;
-  onPinReciterChange?: (value: boolean) => void;
-  onPinTafsirChange?: (value: boolean) => void;
   fontSize: number;
   onFontSizeChange: (size: number) => void;
   readOnlyMushaf?: boolean;
+  mushafFontMode?: MushafFontMode;
+  onMushafFontModeChange?: (mode: MushafFontMode) => void;
 }
 
 export const SettingsModal = ({
@@ -27,13 +27,11 @@ export const SettingsModal = ({
   selectedTafsir,
   onReciterChange,
   onTafsirChange,
-  pinReciter = false,
-  pinTafsir = false,
-  onPinReciterChange,
-  onPinTafsirChange,
   fontSize,
   onFontSizeChange,
   readOnlyMushaf,
+  mushafFontMode = 'madinah-local',
+  onMushafFontModeChange,
 }: SettingsModalProps) => {
   const { isDark } = useTheme();
   const selectClass = `w-full rounded-lg px-3 py-3 outline-none border text-sm ${
@@ -79,17 +77,6 @@ export const SettingsModal = ({
               </option>
             ))}
           </select>
-          <div className="mt-3">
-            <label className="text-sm mb-1 block">تثبيت القارئ</label>
-            <select
-              value={pinReciter ? '1' : '0'}
-              onChange={(e) => onPinReciterChange?.(e.target.value === '1')}
-              className={selectClass}
-            >
-              <option value="1">مفعّل</option>
-              <option value="0">غير مفعّل</option>
-            </select>
-          </div>
         </div>
 
         {/* Tafsir Selection */}
@@ -109,17 +96,6 @@ export const SettingsModal = ({
               </option>
             ))}
           </select>
-          <div className="mt-3">
-            <label className="text-sm mb-1 block">تثبيت التفسير</label>
-            <select
-              value={pinTafsir ? '1' : '0'}
-              onChange={(e) => onPinTafsirChange?.(e.target.value === '1')}
-              className={selectClass}
-            >
-              <option value="1">مفعّل</option>
-              <option value="0">غير مفعّل</option>
-            </select>
-          </div>
         </div>
 
         {/* Font Size */}
@@ -136,6 +112,24 @@ export const SettingsModal = ({
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Mushaf Font */}
+        <div className="mb-6">
+          <label className="text-lg font-semibold block mb-3">نوع خط المصحف</label>
+          <select
+            value={mushafFontMode}
+            onChange={(e) => onMushafFontModeChange?.(e.target.value as MushafFontMode)}
+            className={selectClass}
+          >
+            <option value="default">الخط الافتراضي</option>
+            <option value="madinah-local">خط مصحف المدينة (ملف محلي)</option>
+          </select>
+          {readOnlyMushaf && (
+            <p className={`text-xs mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              يطبّق هذا الخيار على عرض صفحات المصحف.
+            </p>
+          )}
         </div>
 
         {/* Close Button */}

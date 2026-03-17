@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import type { Ayah } from '@/lib/alQuranCloud';
+import { formatSurahLabel } from '@/lib/surahName';
 
 interface MushafPageProps {
   ayahs: Ayah[];
@@ -155,7 +156,7 @@ export function MushafPage({ ayahs, pageNumber, fontSize, onVersePress, highligh
         <span style={{ color: verseNumColor, fontSize: 15, fontWeight: 700 }}>
           {'✦ '}{toArabicNumerals(pageNumber)}{' ✦'}
         </span>
-        <span>{firstSurahName ? `سورة ${firstSurahName}` : ''}</span>
+        <span>{firstSurahName ? formatSurahLabel(firstSurahName) : ''}</span>
       </div>
 
       {/* ── Text content ────────────────────── */}

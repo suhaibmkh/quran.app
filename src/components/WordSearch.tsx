@@ -5,6 +5,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { Search, Play, BookOpen, X } from 'lucide-react';
 import type { Ayah } from '@/lib/alQuranCloud';
 import { fetchAyahAudioUrl, searchAyahs } from '@/lib/alQuranCloud';
+import { formatSurahLabel } from '@/lib/surahName';
 
 interface WordSearchProps {
   selectedReciter: string;
@@ -195,7 +196,7 @@ export function WordSearch({ selectedReciter, onOpenTafsir }: WordSearchProps) {
                 <div className="flex-1 text-right">
                   <p className="leading-relaxed">{m.text}</p>
                   <p className={`text-sm mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {m.surahName ? `سورة ${m.surahName} • ` : ''}﴿{m.numberInSurah}﴾
+                    {m.surahName ? `${formatSurahLabel(m.surahName)} • ` : ''}﴿{m.numberInSurah}﴾
                   </p>
                 </div>
 

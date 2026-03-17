@@ -77,7 +77,7 @@ export const Pagination = ({ currentPage, totalPages, onPageChange }: Pagination
             key={index}
             onClick={() => typeof page === 'number' && onPageChange(page)}
             disabled={page === '...'}
-            className={`px-3 py-2 rounded-lg transition-colors font-semibold text-sm ${
+            className={`px-2.5 py-1.5 rounded-lg transition-colors font-semibold text-xs ${
               page === currentPage
                 ? 'bg-quran-green text-white'
                 : page === '...'
@@ -104,7 +104,7 @@ export const Pagination = ({ currentPage, totalPages, onPageChange }: Pagination
       </button>
 
       <span
-        className={`ml-4 text-sm font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}
+        className={`ml-4 text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}
       >
         الصفحة {currentPage} من {totalPages}
       </span>
