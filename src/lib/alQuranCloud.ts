@@ -25,7 +25,7 @@ export type AyahSearchResult = {
   matches: Ayah[];
 };
 
-const API_BASE = 'https://api.alquran.cloud/v1';
+const API_BASE = '/api/quran';
 
 const quranEditionAyahsCache: Record<string, Promise<Ayah[]>> = {};
 

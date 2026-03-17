@@ -105,6 +105,21 @@ function QuranAppContent() {
     }
   };
 
+  const loadPageAyahsWithFallback = async (page: number): Promise<Ayah[]> => {
+    const editions = ['ar.uthmani', 'quran-uthmani'];
+
+    for (const edition of editions) {
+      try {
+        const ayahs = await fetchPageAyahs(page, edition);
+        if (ayahs.length > 0) return ayahs;
+      } catch {
+        // try next edition
+      }
+    }
+
+    throw new Error('تعذّر تحميل صفحة المصحف من المصدر الحالي');
+  };
+
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(BOOKMARK_STORAGE_KEY);
@@ -166,7 +181,7 @@ function QuranAppContent() {
     setPageVersesLoading(true);
     setPageVersesError(null);
 
-    fetchPageAyahs(page)
+    loadPageAyahsWithFallback(page)
       .then((ayahs) => {
         if (cancelled) return;
         setPageVersesCache((prev) => ({ ...prev, [page]: ayahs }));
@@ -277,21 +292,6 @@ function QuranAppContent() {
     setPendingOpenAyah(null);
   }, [pendingOpenAyah, browseMode, selectedSurah?.id, verses]);
 
-  const headerTitle = readOnlyMushaf
-    ? {
-        name: formattedPageSurahLabel || `الصفحة ${mushafPageNumber}`,
-        englishName: `Page ${mushafPageNumber}`,
-      }
-    : browseMode === 'surah'
-    ? {
-        name: selectedSurah?.name ?? 'القرآن الكريم',
-        englishName: selectedSurah?.englishName ?? '',
-      }
-    : {
-        name: `الجزء ${selectedJuz}`,
-        englishName: `Juz ${selectedJuz}`,
-      };
-
   const versesTotalPages = Math.max(1, Math.ceil(verses.length / VERSES_PER_PAGE));
   const startIndex = (verseListPage - 1) * VERSES_PER_PAGE;
   const paginatedVerses = verses.slice(startIndex, startIndex + VERSES_PER_PAGE);
@@ -323,6 +323,21 @@ function QuranAppContent() {
     return normalizeSurahName(surahStartOnPage?.surahName ?? currentPageAyahs[0]?.surahName ?? '');
   }, [currentPageAyahs]);
   const formattedPageSurahLabel = pageTitleSurahName ? formatSurahLabel(pageTitleSurahName) : '';
+
+  const headerTitle = readOnlyMushaf
+    ? {
+        name: formattedPageSurahLabel || `الصفحة ${mushafPageNumber}`,
+        englishName: `Page ${mushafPageNumber}`,
+      }
+    : browseMode === 'surah'
+    ? {
+        name: selectedSurah?.name ?? 'القرآن الكريم',
+        englishName: selectedSurah?.englishName ?? '',
+      }
+    : {
+        name: `الجزء ${selectedJuz}`,
+        englishName: `Juz ${selectedJuz}`,
+      };
 
   const playbackVerses = readOnlyMushaf ? currentPageAyahs : verses;
   const highlightedAyahGlobalNumber = autoIndex >= 0 ? playbackVerses[autoIndex]?.number : null;

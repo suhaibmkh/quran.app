@@ -56,7 +56,7 @@ function QuranAppContent() {
   const [verseListPage, setVerseListPage] = useState(1);
   const [mushafPageIndex, setMushafPageIndex] = useState(1);
   const [readOnlyMushaf, setReadOnlyMushaf] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Read-only mushaf page browsing (Madinah Mushaf pages 1..604)
   const [mushafPageNumber, setMushafPageNumber] = useState(1);
@@ -120,6 +120,21 @@ function QuranAppContent() {
     } catch {
       // ignore
     }
+  };
+
+  const loadPageAyahsWithFallback = async (page: number): Promise<Ayah[]> => {
+    const editions = ['ar.uthmani', 'quran-uthmani'];
+
+    for (const edition of editions) {
+      try {
+        const ayahs = await fetchPageAyahs(page, edition);
+        if (ayahs.length > 0) return ayahs;
+      } catch {
+        // try next edition
+      }
+    }
+
+    throw new Error('تعذّر تحميل صفحة المصحف من المصدر الحالي');
   };
 
   useEffect(() => {
@@ -241,7 +256,7 @@ function QuranAppContent() {
     setPageVersesLoading(true);
     setPageVersesError(null);
 
-    fetchPageAyahs(page)
+    loadPageAyahsWithFallback(page)
       .then((ayahs) => {
         if (cancelled) return;
         if (!ayahs.length) {
@@ -838,63 +853,71 @@ function QuranAppContent() {
         <main className="flex-1 overflow-y-auto min-w-0 w-full">
           {/* Mushaf navigation bar – sticky at top, mushaf mode only */}
           {readOnlyMushaf && (
-            <div className={`sticky top-0 z-20 border-b px-3 py-2 flex items-center gap-2 flex-wrap ${isDark ? 'bg-dark-card border-gray-700' : 'bg-white border-gray-200'}`}>
-              <button
-                type="button"
-                onClick={() => setMushafPageNumber((p) => Math.max(1, p - 1))}
-                className={`${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-800'} px-3 py-1.5 rounded text-sm font-semibold transition-colors`}
-              >
-                السابقة
-              </button>
-              <input
-                type="range"
-                min={1}
-                max={604}
-                value={mushafPageNumber}
-                onChange={(e) => setMushafPageNumber(Number(e.target.value))}
-                className="flex-1 min-w-0"
-              />
-              <button
-                type="button"
-                onClick={() => setMushafPageNumber((p) => Math.min(604, p + 1))}
-                className={`${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-800'} px-3 py-1.5 rounded text-sm font-semibold transition-colors`}
-              >
-                التالية
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  saveBookmark({ kind: 'page', pageNumber: mushafPageNumber, savedAt: Date.now() });
-                  setBookmarkToast(`تم حفظ الموضع: صفحة ${mushafPageNumber}`);
-                }}
-                className="bg-quran-green/10 ring-1 ring-quran-green/30 text-quran-green px-3 py-1.5 rounded text-sm font-semibold hover:bg-quran-green/20 transition-colors"
-              >
-                حفظ
-              </button>
-              {!mushafListening ? (
+            <div className={`sticky top-0 z-20 border-b px-3 py-2 space-y-2 ${isDark ? 'bg-dark-card border-gray-700' : 'bg-white border-gray-200'}`}>
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={startMushafListening}
-                  disabled={mushafListeningLoading || pageVersesLoading || (pageVersesCache[mushafPageNumber]?.length ?? 0) === 0}
-                  className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
-                    mushafListeningLoading || pageVersesLoading || (pageVersesCache[mushafPageNumber]?.length ?? 0) === 0
-                      ? isDark
-                        ? 'bg-gray-800 text-gray-400 cursor-not-allowed'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-quran-green text-white hover:bg-green-700'
-                  }`}
+                  onClick={() => setMushafPageNumber((p) => Math.max(1, p - 1))}
+                  className={`${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-800'} px-3 py-1.5 rounded text-sm font-semibold transition-colors whitespace-nowrap`}
                 >
-                  {mushafListeningLoading ? 'جاري التحضير...' : 'استماع'}
+                  السابقة
                 </button>
-              ) : (
+
+                <input
+                  type="range"
+                  min={1}
+                  max={604}
+                  value={mushafPageNumber}
+                  onChange={(e) => setMushafPageNumber(Number(e.target.value))}
+                  className="flex-1 min-w-0"
+                />
+
                 <button
                   type="button"
-                  onClick={stopMushafListening}
-                  className={`${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-800'} px-3 py-1.5 rounded text-sm font-semibold transition-colors`}
+                  onClick={() => setMushafPageNumber((p) => Math.min(604, p + 1))}
+                  className={`${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-800'} px-3 py-1.5 rounded text-sm font-semibold transition-colors whitespace-nowrap`}
                 >
-                  إيقاف الاستماع
+                  التالية
                 </button>
-              )}
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    saveBookmark({ kind: 'page', pageNumber: mushafPageNumber, savedAt: Date.now() });
+                    setBookmarkToast(`تم حفظ الموضع: صفحة ${mushafPageNumber}`);
+                  }}
+                  className="bg-quran-green/10 ring-1 ring-quran-green/30 text-quran-green px-3 py-1.5 rounded text-sm font-semibold hover:bg-quran-green/20 transition-colors whitespace-nowrap"
+                >
+                  حفظ
+                </button>
+
+                {!mushafListening ? (
+                  <button
+                    type="button"
+                    onClick={startMushafListening}
+                    disabled={mushafListeningLoading || pageVersesLoading || (pageVersesCache[mushafPageNumber]?.length ?? 0) === 0}
+                    className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors whitespace-nowrap ${
+                      mushafListeningLoading || pageVersesLoading || (pageVersesCache[mushafPageNumber]?.length ?? 0) === 0
+                        ? isDark
+                          ? 'bg-gray-800 text-gray-400 cursor-not-allowed'
+                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-quran-green text-white hover:bg-green-700'
+                    }`}
+                  >
+                    {mushafListeningLoading ? 'جاري التحضير...' : 'استماع'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={stopMushafListening}
+                    className={`${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-800'} px-3 py-1.5 rounded text-sm font-semibold transition-colors whitespace-nowrap`}
+                  >
+                    إيقاف الاستماع
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -945,7 +968,7 @@ function QuranAppContent() {
               ) : (pageVersesCache[mushafPageNumber]?.length ?? 0) === 0 ? (
                 <div className={`rounded-lg p-6 border ${isDark ? 'bg-dark-card border-gray-700 text-gray-300' : 'bg-light-card border-gray-200 text-gray-700'}`}>
                   <p className="font-semibold mb-2">لا توجد بيانات للصفحة الحالية بعد.</p>
-                  <p className="text-sm mb-4">يمكنك إعادة التحميل أو الانتقال للوضع التفاعلي مؤقتًا.</p>
+                  <p className="text-sm mb-4">حاول إعادة التحميل أو الانتقال إلى صفحة أخرى.</p>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
