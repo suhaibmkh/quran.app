@@ -51,6 +51,7 @@ function QuranAppContent() {
   const [verseListPage, setVerseListPage] = useState(1);
   const [mushafPageIndex, setMushafPageIndex] = useState(1);
   const [readOnlyMushaf, setReadOnlyMushaf] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Read-only mushaf page browsing (Madinah Mushaf pages 1..604)
   const [mushafPageNumber, setMushafPageNumber] = useState(1);
@@ -387,6 +388,8 @@ function QuranAppContent() {
           setActiveVerse(null);
           stopAutoPlay();
         }}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen((v) => !v)}
       />
 
       {/* Settings Modal */}
