@@ -69,7 +69,9 @@ function QuranAppContent() {
   const [selectedReciter, setSelectedReciter] = useState<string>(reciters[0]?.identifier ?? 'ar.alafasy');
   const [selectedTafsir, setSelectedTafsir] = useState<string>(tafsirs[0]?.identifier ?? 'ar.muyassar');
 
-  const [fontSize, setFontSize] = useState(22);
+  const [fontSize, setFontSize] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 20 : 22
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [surahVersesCache, setSurahVersesCache] = useState<Record<number, Ayah[]>>({});

@@ -75,7 +75,9 @@ function QuranAppContent() {
   const [pinReciter, setPinReciter] = useState(true);
   const [pinTafsir, setPinTafsir] = useState(true);
 
-  const [fontSize, setFontSize] = useState(22);
+  const [fontSize, setFontSize] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 20 : 22
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [surahVersesCache, setSurahVersesCache] = useState<Record<number, Ayah[]>>({});

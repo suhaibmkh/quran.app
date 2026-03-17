@@ -1,8 +1,14 @@
 'use client';
 
-import { Moon, Sun, BookOpen, Settings } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Moon, Sun, BookOpen, Settings, Download } from 'lucide-react';
 import { Menu, X } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+};
 
 interface HeaderProps {
   currentChapter: { name: string; englishName: string };
@@ -16,6 +22,44 @@ interface HeaderProps {
 
 export const Header = ({ currentChapter, onSettingsClick, readOnlyMushaf, onToggleMushaf, sidebarOpen, onToggleSidebar, hideModeToggle = false }: HeaderProps) => {
   const { isDark, toggleTheme } = useTheme();
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    const standalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      ((window.navigator as Navigator & { standalone?: boolean }).standalone === true);
+    if (standalone) {
+      setIsInstalled(true);
+    }
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setDeferredInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setDeferredInstallPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredInstallPrompt) return;
+    await deferredInstallPrompt.prompt();
+    const choiceResult = await deferredInstallPrompt.userChoice;
+    if (choiceResult.outcome === 'accepted') {
+      setDeferredInstallPrompt(null);
+    }
+  };
 
   return (
       <header
@@ -80,6 +124,21 @@ export const Header = ({ currentChapter, onSettingsClick, readOnlyMushaf, onTogg
               title={readOnlyMushaf ? 'التبديل إلى وضع التفاعل' : 'التبديل إلى وضع المصحف'}
             >
               {readOnlyMushaf ? 'تفاعلي' : 'مصحف'}
+            </button>
+          )}
+
+          {/* Theme */}
+          {!isInstalled && deferredInstallPrompt && (
+            <button
+              onClick={handleInstallClick}
+              className={`flex-shrink-0 p-2 rounded-lg transition-colors ${
+                isDark
+                  ? 'bg-gray-700 text-quran-green hover:bg-gray-600'
+                  : 'bg-gray-100 text-quran-green hover:bg-gray-200'
+              }`}
+              title="تثبيت التطبيق"
+            >
+              <Download size={18} />
             </button>
           )}
 
