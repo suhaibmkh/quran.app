@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Amiri+Quran&family=Scheherazade+New:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
 
 @font-face {
   font-family: 'Madinah Mushaf QuranCom';
@@ -42,7 +42,7 @@
 
 :root {
   --font-ui: 'Cairo', sans-serif;
-  --font-mushaf: 'Madinah Mushaf QuranCom', 'KFGQPC Uthman Taha Naskh', 'Uthmani Hafs', 'Amiri Quran', 'Scheherazade New', serif;
+  --font-mushaf: 'Madinah Mushaf Local', 'Uthmani Hafs', serif;
 }
 
 html {
@@ -53,16 +53,12 @@ html {
   font-family: var(--font-mushaf);
 }
 
-.font-mode-default {
-  --font-mushaf: 'Uthmani Hafs', 'Amiri Quran', 'Scheherazade New', serif;
-}
-
-.font-mode-madinah-qurancom {
-  --font-mushaf: 'Madinah Mushaf QuranCom', 'Uthmani Hafs', 'Amiri Quran', 'Scheherazade New', serif;
-}
-
 .font-mode-madinah-local {
-  --font-mushaf: 'Madinah Mushaf Local', 'KFGQPC Uthman Taha Naskh', 'Uthmani Hafs', 'Amiri Quran', 'Scheherazade New', serif;
+  --font-mushaf: 'Madinah Mushaf Local', 'KFGQPC Uthman Taha Naskh', 'Uthmani Hafs', serif;
+}
+
+.font-mode-uthmani {
+  --font-mushaf: 'Uthmani Hafs', 'KFGQPC Uthmanic Script HAFS', serif;
 }
 
 body {

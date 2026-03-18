@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Amiri+Quran&family=Scheherazade+New:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
 
 @font-face {
   font-family: 'Madinah Mushaf QuranCom';
@@ -42,7 +42,7 @@
 
 :root {
   --font-ui: 'Cairo', sans-serif;
-  --font-mushaf: 'Madinah Mushaf QuranCom', 'KFGQPC Uthman Taha Naskh', 'Uthmani Hafs', 'Amiri Quran', 'Scheherazade New', serif;
+  --font-mushaf: 'Madinah Mushaf Local', 'Uthmani Hafs', serif;
 }
 
 html {
@@ -53,16 +53,12 @@ html {
   font-family: var(--font-mushaf);
 }
 
-.font-mode-default {
-  --font-mushaf: 'Uthmani Hafs', 'Amiri Quran', 'Scheherazade New', serif;
-}
-
-.font-mode-madinah-qurancom {
-  --font-mushaf: 'Madinah Mushaf QuranCom', 'Uthmani Hafs', 'Amiri Quran', 'Scheherazade New', serif;
-}
-
 .font-mode-madinah-local {
-  --font-mushaf: 'Madinah Mushaf Local', 'KFGQPC Uthman Taha Naskh', 'Uthmani Hafs', 'Amiri Quran', 'Scheherazade New', serif;
+  --font-mushaf: 'Madinah Mushaf Local', 'KFGQPC Uthman Taha Naskh', 'Uthmani Hafs', serif;
+}
+
+.font-mode-uthmani {
+  --font-mushaf: 'Uthmani Hafs', 'KFGQPC Uthmanic Script HAFS', serif;
 }
 
 body {
@@ -121,4 +117,77 @@ body {
 
 .page-transition {
   animation: fadeIn 0.3s ease-in;
+}
+
+/* Ornamental frame for verses */
+.verse-frame {
+  position: relative;
+  border: 3px double #8b7355;
+  border-radius: 8px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(139, 115, 85, 0.05) 0%, rgba(184, 134, 11, 0.03) 100%);
+  box-shadow: 
+    inset 0 0 0 1px #d4af37,
+    inset 0 0 0 3px #8b7355,
+    0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dark .verse-frame {
+  border-color: #c9a961;
+  background: linear-gradient(135deg, rgba(201, 169, 97, 0.08) 0%, rgba(184, 134, 11, 0.04) 100%);
+  box-shadow: 
+    inset 0 0 0 1px #d4af37,
+    inset 0 0 0 3px #c9a961,
+    0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Ornamental verse number */
+.verse-number-ornament {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #d4af37 0%, #b8860b 100%);
+  color: #2c1810;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 0.9em;
+  margin: 0 8px;
+  box-shadow: 0 2px 6px rgba(212, 175, 55, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+  position: relative;
+}
+
+.dark .verse-number-ornament {
+  background: linear-gradient(135deg, #c9a961 0%, #b8860b 100%);
+  color: #1a1410;
+}
+
+/* Page border decoration */
+.page-decoration {
+  border: 4px solid #8b7355;
+  border-radius: 6px;
+  background: 
+    linear-gradient(90deg, transparent 0%, #d4af37 25%, #d4af37 75%, transparent 100%) top,
+    linear-gradient(90deg, transparent 0%, #d4af37 25%, #d4af37 75%, transparent 100%) bottom,
+    linear-gradient(180deg, transparent 0%, #d4af37 25%, #d4af37 75%, transparent 100%) left,
+    linear-gradient(180deg, transparent 0%, #d4af37 25%, #d4af37 75%, transparent 100%) right;
+  background-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%;
+  background-position: 0 0, 0 100%, 0 0, 100% 0;
+  background-repeat: no-repeat;
+  padding: 20px;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.05);
+}
+
+.dark .page-decoration {
+  border-color: #c9a961;
+  background: 
+    linear-gradient(90deg, transparent 0%, #c9a961 25%, #c9a961 75%, transparent 100%) top,
+    linear-gradient(90deg, transparent 0%, #c9a961 25%, #c9a961 75%, transparent 100%) bottom,
+    linear-gradient(180deg, transparent 0%, #c9a961 25%, #c9a961 75%, transparent 100%) left,
+    linear-gradient(180deg, transparent 0%, #c9a961 25%, #c9a961 75%, transparent 100%) right;
+  background-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%;
+  background-position: 0 0, 0 100%, 0 0, 100% 0;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
 }

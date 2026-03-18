@@ -74,9 +74,7 @@ function QuranAppContent() {
   const [selectedReciter, setSelectedReciter] = useState<string>(reciters[0]?.identifier ?? 'ar.alafasy');
   const [selectedTafsir, setSelectedTafsir] = useState<string>(tafsirs[0]?.identifier ?? 'ar.muyassar');
 
-  const [fontSize, setFontSize] = useState(() =>
-    typeof window !== 'undefined' && window.innerWidth < 768 ? 20 : 22
-  );
+  const [fontSize, setFontSize] = useState(22);
   const [mushafFontMode, setMushafFontMode] = useState<MushafFontMode>('madinah-local');
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -195,10 +193,11 @@ function QuranAppContent() {
   useEffect(() => {
     try {
       const savedMushafFontMode = window.localStorage.getItem(MUSHAF_FONT_MODE_KEY);
-      if (savedMushafFontMode === 'default' || savedMushafFontMode === 'madinah-local') {
-        setMushafFontMode(savedMushafFontMode);
-      } else if (savedMushafFontMode === 'madinah' || savedMushafFontMode === 'madinah-qurancom') {
-        // Migrate removed/old options to local Madinah font.
+      const validModes = ['madinah-local', 'uthmani'];
+      if (validModes.includes(savedMushafFontMode || '')) {
+        setMushafFontMode(savedMushafFontMode as MushafFontMode);
+      } else {
+        // Default to madinah-local
         setMushafFontMode('madinah-local');
       }
     } catch {
@@ -565,15 +564,27 @@ function QuranAppContent() {
     const deltaX = touch.clientX - startX;
     const deltaY = touch.clientY - startY;
 
-    // Ignore vertical scroll gestures and short swipes.
-    if (Math.abs(deltaX) < 45 || Math.abs(deltaX) < Math.abs(deltaY)) return;
+    // معالجة السحب العمودي أولاً (من أسفل لأعلى أو العكس)
+    if (Math.abs(deltaY) > 60 && Math.abs(deltaY) > Math.abs(deltaX)) {
+      if (deltaY < 0) {
+        // سحب من أسفل لأعلى → الصفحة التالية
+        setMushafPageNumber((p) => Math.min(604, p + 1));
+      } else {
+        // سحب من أعلى لأسفل → الصفحة السابقة
+        setMushafPageNumber((p) => Math.max(1, p - 1));
+      }
+      return;
+    }
 
-    if (deltaX > 0) {
-      // سحب من اليسار إلى اليمين → تقدّم للصفحة التالية
-      setMushafPageNumber((p) => Math.min(604, p + 1));
-    } else {
-      // سحب من اليمين إلى اليسار → رجوع للصفحة السابقة
-      setMushafPageNumber((p) => Math.max(1, p - 1));
+    // معالجة السحب الأفقي (من اليسار لليمين أو العكس)
+    if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (deltaX > 0) {
+        // سحب من اليسار إلى اليمين → الصفحة التالية
+        setMushafPageNumber((p) => Math.min(604, p + 1));
+      } else {
+        // سحب من اليمين إلى اليسار → الصفحة السابقة
+        setMushafPageNumber((p) => Math.max(1, p - 1));
+      }
     }
   };
 
@@ -879,18 +890,45 @@ function QuranAppContent() {
                 >
                   التالية
                 </button>
+
+                <span className={`text-sm font-semibold whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                  {mushafPageNumber}/604
+                </span>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="number"
+                  min={1}
+                  max={604}
+                  placeholder="رقم الصفحة"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const page = Math.max(1, Math.min(604, Number((e.target as HTMLInputElement).value) || 1));
+                      setMushafPageNumber(page);
+                      (e.target as HTMLInputElement).value = '';
+                    }
+                  }}
+                  className={`w-24 rounded px-2 py-1.5 text-sm outline-none border ${
+                    isDark
+                      ? 'bg-gray-800 border-gray-700 text-white placeholder-gray-500'
+                      : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'
+                  }`}
+                />
+
                 <button
                   type="button"
                   onClick={() => {
-                    saveBookmark({ kind: 'page', pageNumber: mushafPageNumber, savedAt: Date.now() });
-                    setBookmarkToast(`تم حفظ الموضع: صفحة ${mushafPageNumber}`);
+                    const input = document.querySelector('input[placeholder="رقم الصفحة"]') as HTMLInputElement;
+                    if (input && input.value) {
+                      const page = Math.max(1, Math.min(604, Number(input.value)));
+                      setMushafPageNumber(page);
+                      input.value = '';
+                    }
                   }}
-                  className="bg-quran-green/10 ring-1 ring-quran-green/30 text-quran-green px-3 py-1.5 rounded text-sm font-semibold hover:bg-quran-green/20 transition-colors whitespace-nowrap"
+                  className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors whitespace-nowrap"
                 >
-                  حفظ
+                  الانتقال إلى
                 </button>
 
                 {!mushafListening ? (
@@ -917,6 +955,19 @@ function QuranAppContent() {
                     إيقاف الاستماع
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    saveBookmark({ kind: 'page', pageNumber: mushafPageNumber, savedAt: Date.now() });
+                    setBookmarkToast(`تم حفظ الموضع: صفحة ${mushafPageNumber}`);
+                  }}
+                  className="bg-quran-green/10 ring-1 ring-quran-green/30 text-quran-green px-3 py-1.5 rounded text-sm font-semibold hover:bg-quran-green/20 transition-colors whitespace-nowrap"
+                >
+                  {bookmark && bookmark.kind === 'page'
+                    ? `آخر موضع: صفحة ${bookmark.pageNumber}`
+                    : 'حفظ'}
+                </button>
               </div>
             </div>
           )}
@@ -996,9 +1047,9 @@ function QuranAppContent() {
               ) : (
                 <div
                   className={
-                    mushafFontMode === 'madinah-local'
-                      ? 'font-mode-madinah-local'
-                      : 'font-mode-default'
+                    mushafFontMode === 'uthmani'
+                      ? 'font-mode-uthmani'
+                      : 'font-mode-madinah-local'
                   }
                   onTouchStart={handleMushafTouchStart}
                   onTouchEnd={handleMushafTouchEnd}

@@ -28,16 +28,21 @@ export const Verse = ({
         isHighlighted
           ? 'ring-2 ring-quran-green bg-quran-green/10'
           : ''
-      } rounded-lg p-4 mb-4 transition-colors duration-300 cursor-pointer group`}
+      } verse-frame transition-colors duration-300 cursor-pointer group`}
       onClick={onOpen}
     >
       {/* Verse Number and Text */}
       <div className="flex items-start gap-4">
         <div className="flex-1 text-right">
           <p className="leading-relaxed" style={{ fontSize }}>{verse.text}</p>
-          <p className={`text-sm mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-            {verse.surahName ? `${formatSurahLabel(verse.surahName)} • ` : ''}﴿{verse.numberInSurah}﴾
-          </p>
+          <div className="flex items-center justify-end gap-2 mt-3">
+            <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              {verse.surahName ? `${formatSurahLabel(verse.surahName)}` : ''}
+            </span>
+            <span className="verse-number-ornament">
+              ﴿{verse.numberInSurah}﴾
+            </span>
+          </div>
         </div>
 
         {/* Action Buttons */}

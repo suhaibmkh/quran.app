@@ -4,7 +4,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { reciters, tafsirs } from '@/data/quran';
 import { X, Volume2, BookOpen } from 'lucide-react';
 
-export type MushafFontMode = 'default' | 'madinah-local';
+export type MushafFontMode = 'uthmani' | 'madinah-local';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -122,8 +122,8 @@ export const SettingsModal = ({
             onChange={(e) => onMushafFontModeChange?.(e.target.value as MushafFontMode)}
             className={selectClass}
           >
-            <option value="default">الخط الافتراضي</option>
-            <option value="madinah-local">خط مصحف المدينة (ملف محلي)</option>
+            <option value="madinah-local">خط مصحف المدينة</option>
+            <option value="uthmani">الخط العثماني</option>
           </select>
           {readOnlyMushaf && (
             <p className={`text-xs mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
