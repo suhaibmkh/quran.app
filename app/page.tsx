@@ -564,19 +564,7 @@ function QuranAppContent() {
     const deltaX = touch.clientX - startX;
     const deltaY = touch.clientY - startY;
 
-    // معالجة السحب العمودي أولاً (من أسفل لأعلى أو العكس)
-    if (Math.abs(deltaY) > 60 && Math.abs(deltaY) > Math.abs(deltaX)) {
-      if (deltaY < 0) {
-        // سحب من أسفل لأعلى → الصفحة التالية
-        setMushafPageNumber((p) => Math.min(604, p + 1));
-      } else {
-        // سحب من أعلى لأسفل → الصفحة السابقة
-        setMushafPageNumber((p) => Math.max(1, p - 1));
-      }
-      return;
-    }
-
-    // معالجة السحب الأفقي (من اليسار لليمين أو العكس)
+    // معالجة السحب الأفقي فقط (من اليسار لليمين أو العكس)
     if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY)) {
       if (deltaX > 0) {
         // سحب من اليسار إلى اليمين → الصفحة التالية
