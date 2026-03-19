@@ -24,6 +24,9 @@ export const Header = ({ currentChapter, onSettingsClick, readOnlyMushaf, onTogg
   const { isDark, toggleTheme } = useTheme();
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [isIOSDevice, setIsIOSDevice] = useState(false);
+  const [isIOSSafari, setIsIOSSafari] = useState(false);
+  const [showIOSInstallHint, setShowIOSInstallHint] = useState(false);
 
   useEffect(() => {
     const standalone =
@@ -41,7 +44,15 @@ export const Header = ({ currentChapter, onSettingsClick, readOnlyMushaf, onTogg
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setDeferredInstallPrompt(null);
+      setShowIOSInstallHint(false);
     };
+
+    const userAgent = window.navigator.userAgent;
+    const iOS = /iPad|iPhone|iPod/.test(userAgent);
+    const webkit = /WebKit/.test(userAgent);
+    const notOtherBrowser = !/CriOS|FxiOS|EdgiOS|OPiOS/.test(userAgent);
+    setIsIOSDevice(iOS);
+    setIsIOSSafari(iOS && webkit && notOtherBrowser);
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener);
     window.addEventListener('appinstalled', handleAppInstalled);
@@ -53,11 +64,17 @@ export const Header = ({ currentChapter, onSettingsClick, readOnlyMushaf, onTogg
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredInstallPrompt) return;
-    await deferredInstallPrompt.prompt();
-    const choiceResult = await deferredInstallPrompt.userChoice;
-    if (choiceResult.outcome === 'accepted') {
-      setDeferredInstallPrompt(null);
+    if (deferredInstallPrompt) {
+      await deferredInstallPrompt.prompt();
+      const choiceResult = await deferredInstallPrompt.userChoice;
+      if (choiceResult.outcome === 'accepted') {
+        setDeferredInstallPrompt(null);
+      }
+      return;
+    }
+
+    if (isIOSDevice) {
+      setShowIOSInstallHint(true);
     }
   };
 
@@ -128,7 +145,7 @@ export const Header = ({ currentChapter, onSettingsClick, readOnlyMushaf, onTogg
           )}
 
           {/* Theme */}
-          {!isInstalled && deferredInstallPrompt && (
+          {!isInstalled && (deferredInstallPrompt || isIOSDevice) && (
             <button
               onClick={handleInstallClick}
               className={`flex-shrink-0 p-2 rounded-lg transition-colors ${
@@ -136,7 +153,7 @@ export const Header = ({ currentChapter, onSettingsClick, readOnlyMushaf, onTogg
                   ? 'bg-gray-700 text-quran-green hover:bg-gray-600'
                   : 'bg-gray-100 text-quran-green hover:bg-gray-200'
               }`}
-              title="تثبيت التطبيق"
+              title={deferredInstallPrompt ? 'تثبيت التطبيق' : 'إضافة إلى الشاشة الرئيسية'}
             >
               <Download size={18} />
             </button>
@@ -168,6 +185,28 @@ export const Header = ({ currentChapter, onSettingsClick, readOnlyMushaf, onTogg
             <Settings size={18} />
           </button>
         </div>
+
+        {showIOSInstallHint && !isInstalled && (
+          <div className={`px-3 pb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`} dir="rtl">
+            <div className={`rounded-lg border p-2 text-xs leading-6 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
+              <div className="flex items-start justify-between gap-3">
+                <p>
+                  {isIOSSafari
+                    ? 'على iPhone: اضغط زر المشاركة في Safari ثم اختر "إضافة إلى الشاشة الرئيسية".'
+                    : 'على iPhone: افتح الموقع في Safari أولاً، ثم اضغط مشاركة واختر "إضافة إلى الشاشة الرئيسية".'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowIOSInstallHint(false)}
+                  className={`flex-shrink-0 rounded p-1 ${isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
+                  aria-label="إغلاق"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </header>
   );
 };

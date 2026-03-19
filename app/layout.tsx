@@ -9,6 +9,15 @@ export const metadata: Metadata = {
   title: "القرآن الكريم تلاوة وقراءة وتفسير",
   description: "سور القران الكريم كامل قراءة وتفسير واستماع",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
   verification: {
     google: "KZ9kjW9cdTI7kG6wOQwGtzKvHM1XJVpq3SO7YH4VXzc",
   },
