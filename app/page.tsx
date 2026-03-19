@@ -12,6 +12,8 @@ import { reciters, tafsirs } from '@/data/quran';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { VerseModal } from '@/components/VerseModal';
 import { MushafPage } from '@/components/MushafPage';
+import { VerseToolbar } from '@/components/VerseToolbar';
+import { TafsirModal } from '../src/components/TafsirModal';
 import type { MushafFontMode } from '@/components/SettingsModal';
 import type { Ayah, SurahSummary } from '@/lib/alQuranCloud';
 import { fetchAyahAudioUrl, fetchJuzAyahs, fetchPageAyahs, fetchSurahAyahs, fetchSurahs } from '@/lib/alQuranCloud';
@@ -75,7 +77,7 @@ function QuranAppContent() {
   const [selectedTafsir, setSelectedTafsir] = useState<string>(tafsirs[0]?.identifier ?? 'ar.muyassar');
 
   const [fontSize, setFontSize] = useState(22);
-  const [mushafFontMode, setMushafFontMode] = useState<MushafFontMode>('madinah-local');
+  const [mushafFontMode, setMushafFontMode] = useState<MushafFontMode>('amiri-quran');
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [surahVersesCache, setSurahVersesCache] = useState<Record<number, Ayah[]>>({});
@@ -85,6 +87,12 @@ function QuranAppContent() {
 
   const [verseModalOpen, setVerseModalOpen] = useState(false);
   const [activeVerse, setActiveVerse] = useState<Ayah | null>(null);
+
+  // Verse toolbar (mushaf mode: click on verse → floating bottom bar)
+  const [toolbarVerse, setToolbarVerse] = useState<Ayah | null>(null);
+  const [tafsirModalOpen, setTafsirModalOpen] = useState(false);
+  const [tafsirAyah, setTafsirAyah] = useState<Ayah | null>(null);
+  const [toolbarRect, setToolbarRect] = useState<DOMRect | null>(null);
 
   // Auto-play (full surah)
   const autoAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -133,6 +141,22 @@ function QuranAppContent() {
     }
 
     throw new Error('تعذّر تحميل صفحة المصحف من المصدر الحالي');
+  };
+
+  const reloadMushafPage = async (page: number) => {
+    setPageVersesLoading(true);
+    setPageVersesError(null);
+    try {
+      const ayahs = await loadPageAyahsWithFallback(page);
+      if (!ayahs.length) {
+        throw new Error('تعذّر عرض الصفحة الحالية. حاول صفحة أخرى أو أعد المحاولة.');
+      }
+      setPageVersesCache((prev) => ({ ...prev, [page]: ayahs }));
+    } catch (err) {
+      setPageVersesError(err instanceof Error ? err.message : 'تعذّر تحميل صفحة المصحف');
+    } finally {
+      setPageVersesLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -193,12 +217,12 @@ function QuranAppContent() {
   useEffect(() => {
     try {
       const savedMushafFontMode = window.localStorage.getItem(MUSHAF_FONT_MODE_KEY);
-      const validModes = ['madinah-local', 'uthmani'];
+      const validModes = ['uthmani', 'amiri', 'amiri-quran'];
       if (validModes.includes(savedMushafFontMode || '')) {
         setMushafFontMode(savedMushafFontMode as MushafFontMode);
       } else {
-        // Default to madinah-local
-        setMushafFontMode('madinah-local');
+        // Default to amiri-quran
+        setMushafFontMode('amiri-quran');
       }
     } catch {
       // ignore
@@ -244,39 +268,14 @@ function QuranAppContent() {
     setMushafPageIndex(1);
   }, [browseMode, selectedChapter, selectedJuz]);
 
-  // Fetch verses for the current mushaf page in read-only mode (with caching)
+  // Fetch verses for current mushaf page (reliable direct trigger)
   useEffect(() => {
     if (!readOnlyMushaf) return;
     const page = mushafPageNumber;
     if (!page) return;
-    if (pageVersesCache[page]) return;
-
-    let cancelled = false;
-    setPageVersesLoading(true);
-    setPageVersesError(null);
-
-    loadPageAyahsWithFallback(page)
-      .then((ayahs) => {
-        if (cancelled) return;
-        if (!ayahs.length) {
-          setPageVersesError('تعذّر عرض الصفحة الحالية. حاول صفحة أخرى أو أعد المحاولة.');
-          return;
-        }
-        setPageVersesCache((prev) => ({ ...prev, [page]: ayahs }));
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setPageVersesError(err instanceof Error ? err.message : 'تعذّر تحميل صفحة المصحف');
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setPageVersesLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [readOnlyMushaf, mushafPageNumber, pageVersesCache]);
+    if ((pageVersesCache[page]?.length ?? 0) > 0) return;
+    void reloadMushafPage(page);
+  }, [readOnlyMushaf, mushafPageNumber]);
 
   // Auto-save bookmark when navigating mushaf pages
   useEffect(() => {
@@ -295,6 +294,23 @@ function QuranAppContent() {
       autoAudioRef.current.currentTime = 0;
     }
   }, [browseMode, selectedChapter, selectedJuz]);
+
+  // Clear toolbar verse when page changes (avoid stale selection)
+  useEffect(() => {
+    if (!mushafListening) {
+      setToolbarVerse(null);
+    }
+  }, [mushafPageNumber]);
+
+  // Close toolbar when user scrolls (rect becomes stale)
+  useEffect(() => {
+    if (!toolbarVerse) return;
+    const close = () => {
+      if (!mushafListening && !tafsirModalOpen) setToolbarVerse(null);
+    };
+    window.addEventListener('scroll', close, { passive: true, capture: true });
+    return () => window.removeEventListener('scroll', close, { capture: true });
+  }, [toolbarVerse, mushafListening, tafsirModalOpen]);
 
   // Fetch verses for the current selection (with caching)
   useEffect(() => {
@@ -1012,12 +1028,12 @@ function QuranAppContent() {
                     <button
                       type="button"
                       onClick={() => {
-                        setPageVersesError(null);
                         setPageVersesCache((prev) => {
                           const next = { ...prev };
                           delete next[mushafPageNumber];
                           return next;
                         });
+                        void reloadMushafPage(mushafPageNumber);
                       }}
                       className="px-3 py-1.5 rounded bg-quran-green text-white text-sm font-semibold hover:bg-green-700 transition-colors"
                     >
@@ -1037,7 +1053,9 @@ function QuranAppContent() {
                   className={
                     mushafFontMode === 'uthmani'
                       ? 'font-mode-uthmani'
-                      : 'font-mode-madinah-local'
+                      : mushafFontMode === 'amiri'
+                      ? 'font-mode-amiri'
+                      : 'font-mode-amiri-quran'
                   }
                   onTouchStart={handleMushafTouchStart}
                   onTouchEnd={handleMushafTouchEnd}
@@ -1047,11 +1065,10 @@ function QuranAppContent() {
                     ayahs={pageVersesCache[mushafPageNumber] ?? []}
                     pageNumber={mushafPageNumber}
                     fontSize={fontSize + 8}
-                    surahVerseCounts={surahVerseCounts}
                     highlightedAyahNumber={mushafHighlightedAyahNumber}
-                    onVersePress={(ayah) => {
-                      setActiveVerse(ayah);
-                      setVerseModalOpen(true);
+                    onVersePress={(ayah, rect) => {
+                      setToolbarVerse(ayah);
+                      setToolbarRect(rect);
                     }}
                   />
                 </div>
@@ -1159,6 +1176,50 @@ function QuranAppContent() {
         }}
         onEnded={() => {
           handleMushafAudioEnded();
+        }}
+      />
+
+      {/* ── Verse Toolbar ── */}
+      {toolbarVerse && toolbarRect && (
+        <VerseToolbar
+          ayah={toolbarVerse}
+          rect={toolbarRect}
+          isPlaying={mushafListening}
+          isLoading={mushafListeningLoading}
+          reciters={reciters}
+          selectedReciter={selectedReciter}
+          onReciterChange={(id) => {
+            setSelectedReciter(id);
+            // If currently playing, restart from toolbar verse with new reciter
+            if (mushafListening) {
+              stopMushafListening();
+            }
+          }}
+          onPlay={() => {
+            void playMushafAyah(toolbarVerse);
+          }}
+          onStop={stopMushafListening}
+          onTafsir={() => {
+            setTafsirAyah(toolbarVerse);
+            setTafsirModalOpen(true);
+          }}
+          onClose={() => {
+            setToolbarVerse(null);
+            stopMushafListening();
+          }}
+        />
+      )}
+
+      {/* ── Tafsir Modal ── */}
+      <TafsirModal
+        isOpen={tafsirModalOpen}
+        ayah={tafsirAyah}
+        tafsirs={tafsirs}
+        selectedTafsir={selectedTafsir}
+        onTafsirChange={setSelectedTafsir}
+        onClose={() => {
+          setTafsirModalOpen(false);
+          setTafsirAyah(null);
         }}
       />
     </div>

@@ -4,7 +4,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { reciters, tafsirs } from '@/data/quran';
 import { X, Volume2, BookOpen } from 'lucide-react';
 
-export type MushafFontMode = 'uthmani' | 'madinah-local';
+export type MushafFontMode = 'uthmani' | 'amiri' | 'amiri-quran';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -30,7 +30,7 @@ export const SettingsModal = ({
   fontSize,
   onFontSizeChange,
   readOnlyMushaf,
-  mushafFontMode = 'madinah-local',
+  mushafFontMode = 'amiri-quran',
   onMushafFontModeChange,
 }: SettingsModalProps) => {
   const { isDark } = useTheme();
@@ -122,8 +122,9 @@ export const SettingsModal = ({
             onChange={(e) => onMushafFontModeChange?.(e.target.value as MushafFontMode)}
             className={selectClass}
           >
-            <option value="madinah-local">خط مصحف المدينة</option>
             <option value="uthmani">الخط العثماني</option>
+            <option value="amiri">Amiri</option>
+            <option value="amiri-quran">Amiri Quran</option>
           </select>
           {readOnlyMushaf && (
             <p className={`text-xs mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
