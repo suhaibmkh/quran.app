@@ -36,6 +36,8 @@ const BASMALAH = 'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَ�
 function normalizeArabic(input: string): string {
   return input
     .normalize('NFKD')
+    // Normalize alef variants so phrases like "ٱللَّه" match "الله"
+    .replace(/[ٱأإآ]/g, 'ا')
     .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, '')
     .replace(/\u0640/g, '')
     .replace(/\s+/g, ' ')
@@ -48,9 +50,8 @@ function stripLeadingBasmalah(text: string): string {
   const normalized = normalizeArabic(text);
   if (!normalized.startsWith(NORMALIZED_BASMALAH)) return text;
 
-  // In API text, basmalah is typically the first 4 words; keep only the remainder.
+  // In this edition, basmalah is typically injected as the first 4 words.
   const words = text.trim().split(/\s+/);
-  if (words.length <= 4) return text;
   return words.slice(4).join(' ').trim();
 }
 
@@ -87,7 +88,6 @@ export function MushafPage({ ayahs, pageNumber, fontSize, onVersePress, highligh
   const firstSurahName = groups[0]?.surahName ?? '';
 
   const textColor   = isDark ? '#e2d5bc' : '#24180c';
-  const bismillahColor = isDark ? '#c9a84c' : '#4f3913';
   const hljBg       = isDark ? 'rgba(201,168,76,0.18)' : 'rgba(201,168,76,0.25)';
 
   return (
@@ -110,7 +110,8 @@ export function MushafPage({ ayahs, pageNumber, fontSize, onVersePress, highligh
           const firstAyah = group.ayahs[0];
           const firstAyahText = firstAyah?.text ?? '';
           const firstAyahHasBasmalah = normalizeArabic(firstAyahText).startsWith(NORMALIZED_BASMALAH);
-          const showBasmalah = group.surahId !== 1 && group.surahId !== 9;
+          const shouldShowStandaloneBasmalah =
+            group.startsFromVerse1 && group.surahId !== 1 && group.surahId !== 9;
 
           return (
             <div key={`${group.surahId}-${gi}`}>
@@ -120,11 +121,20 @@ export function MushafPage({ ayahs, pageNumber, fontSize, onVersePress, highligh
                   <div style={{ fontSize: Math.max(20, fontSize - 2), fontWeight: 700, color: textColor }}>
                     {formatSurahLabel(group.surahName)}
                   </div>
-                  {showBasmalah && (
-                    <div style={{ fontSize: Math.max(18, fontSize - 4), color: bismillahColor, marginTop: 4 }}>
-                      {BASMALAH}
-                    </div>
-                  )}
+                </div>
+              )}
+
+              {shouldShowStandaloneBasmalah && (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    margin: '6px 0 10px',
+                    fontSize: Math.max(19, fontSize - 1),
+                    lineHeight: 1.9,
+                    color: textColor,
+                  }}
+                >
+                  {BASMALAH}
                 </div>
               )}
 
@@ -141,10 +151,18 @@ export function MushafPage({ ayahs, pageNumber, fontSize, onVersePress, highligh
                 {group.ayahs.map((ayah) => {
                   const isHighlighted = highlightedAyahNumber === ayah.number;
                   const isFirstAyah = group.startsFromVerse1 && ayah.number === firstAyah?.number;
+                  const shouldStripBasmalah =
+                    isFirstAyah && firstAyahHasBasmalah && group.surahId !== 1;
                   const displayText =
-                    isFirstAyah && firstAyahHasBasmalah
+                    shouldStripBasmalah
                       ? stripLeadingBasmalah(ayah.text)
                       : ayah.text;
+
+                  // Hide empty first ayah if API provided only basmalah.
+                  if (shouldStripBasmalah && !displayText) {
+                    return null;
+                  }
+
                   return (
                     <span key={ayah.number} style={{ display: 'inline' }}>
                       <span

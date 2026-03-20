@@ -14,6 +14,8 @@ export type Ayah = {
   text: string;
   page?: number;
   juz?: number;
+  /** Quarter index of hizb (1..240) */
+  hizbQuarter?: number;
   /** Present when ayah is fetched as part of a juz or when provided by the API */
   surahId?: number;
   surahName?: string;
@@ -60,6 +62,7 @@ async function fetchQuranEditionAyahs(edition: string): Promise<Ayah[]> {
             text: a.text,
             page: a.page,
             juz: a.juz,
+            hizbQuarter: a.hizbQuarter,
             surahId,
             surahName,
             surahEnglishName,
@@ -94,20 +97,33 @@ export async function fetchSurahs(): Promise<SurahSummary[]> {
 }
 
 export async function fetchSurahAyahs(surahId: number): Promise<Ayah[]> {
-  const data = await fetchJson<{ data: { ayahs: any[] } }>(
-    `${API_BASE}/surah/${surahId}/ar.uthmani`
-  );
+  const editions = ['quran-uthmani', 'ar.uthmani'];
 
-  return data.data.ayahs.map((a) => ({
-    number: a.number,
-    numberInSurah: a.numberInSurah,
-    text: a.text,
-    page: a.page,
-    juz: a.juz,
-    surahId: a?.surah?.number ?? surahId,
-    surahName: a?.surah?.name,
-    surahEnglishName: a?.surah?.englishName,
-  }));
+  for (const edition of editions) {
+    try {
+      const data = await fetchJson<{ data: { ayahs: any[] } }>(
+        `${API_BASE}/surah/${surahId}/${edition}`
+      );
+
+      const mapped = data.data.ayahs.map((a) => ({
+        number: a.number,
+        numberInSurah: a.numberInSurah,
+        text: a.text,
+        page: a.page,
+        juz: a.juz,
+        hizbQuarter: a.hizbQuarter,
+        surahId: a?.surah?.number ?? surahId,
+        surahName: a?.surah?.name,
+        surahEnglishName: a?.surah?.englishName,
+      }));
+
+      if (mapped.length > 0) return mapped;
+    } catch {
+      // try next edition
+    }
+  }
+
+  throw new Error('تعذّر تحميل آيات السورة');
 }
 
 export async function fetchJuzAyahs(juzNumber: number): Promise<Ayah[]> {
@@ -115,23 +131,36 @@ export async function fetchJuzAyahs(juzNumber: number): Promise<Ayah[]> {
     throw new Error('رقم الجزء غير صالح');
   }
 
-  const data = await fetchJson<{ data: { ayahs: any[] } }>(
-    `${API_BASE}/juz/${juzNumber}/ar.uthmani`
-  );
+  const editions = ['quran-uthmani', 'ar.uthmani'];
 
-  return data.data.ayahs.map((a) => ({
-    number: a.number,
-    numberInSurah: a.numberInSurah,
-    text: a.text,
-    page: a.page,
-    juz: a.juz,
-    surahId: a?.surah?.number,
-    surahName: a?.surah?.name,
-    surahEnglishName: a?.surah?.englishName,
-  }));
+  for (const edition of editions) {
+    try {
+      const data = await fetchJson<{ data: { ayahs: any[] } }>(
+        `${API_BASE}/juz/${juzNumber}/${edition}`
+      );
+
+      const mapped = data.data.ayahs.map((a) => ({
+        number: a.number,
+        numberInSurah: a.numberInSurah,
+        text: a.text,
+        page: a.page,
+        juz: a.juz,
+        hizbQuarter: a.hizbQuarter,
+        surahId: a?.surah?.number,
+        surahName: a?.surah?.name,
+        surahEnglishName: a?.surah?.englishName,
+      }));
+
+      if (mapped.length > 0) return mapped;
+    } catch {
+      // try next edition
+    }
+  }
+
+  throw new Error('تعذّر تحميل آيات الجزء');
 }
 
-export async function fetchPageAyahs(pageNumber: number, edition: string = 'ar.uthmani'): Promise<Ayah[]> {
+export async function fetchPageAyahs(pageNumber: number, edition: string = 'quran-uthmani'): Promise<Ayah[]> {
   if (!Number.isFinite(pageNumber) || pageNumber < 1 || pageNumber > 604) {
     throw new Error('رقم الصفحة غير صالح');
   }
@@ -146,6 +175,7 @@ export async function fetchPageAyahs(pageNumber: number, edition: string = 'ar.u
     text: a.text,
     page: a.page,
     juz: a.juz,
+    hizbQuarter: a.hizbQuarter,
     surahId: a?.surah?.number,
     surahName: a?.surah?.name,
     surahEnglishName: a?.surah?.englishName,

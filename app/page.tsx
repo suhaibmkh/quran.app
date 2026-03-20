@@ -16,7 +16,7 @@ import { VerseToolbar } from '@/components/VerseToolbar';
 import { TafsirModal } from '../src/components/TafsirModal';
 import type { MushafFontMode } from '@/components/SettingsModal';
 import type { Ayah, SurahSummary } from '@/lib/alQuranCloud';
-import { fetchAyahAudioUrl, fetchJuzAyahs, fetchPageAyahs, fetchSurahAyahs, fetchSurahs } from '@/lib/alQuranCloud';
+import { fetchAyahAudioUrl, getAyahAudioUrl, fetchJuzAyahs, fetchPageAyahs, fetchSurahAyahs, fetchSurahs } from '@/lib/alQuranCloud';
 import { formatSurahLabel, normalizeSurahName } from '@/lib/surahName';
 
 const VERSES_PER_PAGE = 10;
@@ -106,7 +106,10 @@ function QuranAppContent() {
   const touchStartYRef = useRef<number | null>(null);
 
   // Mushaf listening mode (page-by-page with ayah highlight)
-  const mushafAudioRef = useRef<HTMLAudioElement | null>(null);
+  const mushafAudioRef = useRef<HTMLAudioElement | null>(null);  // active buffer
+  const mushafAudioRef2 = useRef<HTMLAudioElement | null>(null); // prefetch buffer
+  const mushafActiveIsFirstRef = useRef<boolean>(true);          // which buffer is active
+  const mushafPrefetchedAyahRef = useRef<number>(-1);            // ayah number preloaded in inactive buffer
   const [mushafListening, setMushafListening] = useState(false);
   const [mushafListeningLoading, setMushafListeningLoading] = useState(false);
   const [mushafListeningError, setMushafListeningError] = useState<string | null>(null);
@@ -129,7 +132,7 @@ function QuranAppContent() {
   };
 
   const loadPageAyahsWithFallback = async (page: number): Promise<Ayah[]> => {
-    const editions = ['ar.uthmani', 'quran-uthmani'];
+    const editions = ['quran-uthmani', 'ar.uthmani'];
 
     for (const edition of editions) {
       try {
@@ -523,11 +526,15 @@ function QuranAppContent() {
     setMushafListeningError(null);
     setMushafPendingNextPageAutoPlay(false);
     setMushafHighlightedAyahNumber(null);
+    mushafPrefetchedAyahRef.current = -1;
 
-    if (mushafAudioRef.current) {
-      mushafAudioRef.current.pause();
-      mushafAudioRef.current.currentTime = 0;
+    for (const ref of [mushafAudioRef, mushafAudioRef2]) {
+      if (ref.current) {
+        ref.current.pause();
+        ref.current.src = '';
+      }
     }
+    mushafActiveIsFirstRef.current = true;
   };
 
   const handleChapterSelect = async (chapterId: number) => {
@@ -593,9 +600,6 @@ function QuranAppContent() {
   };
 
   const playMushafAyah = async (ayah: Ayah) => {
-    const audioEl = mushafAudioRef.current;
-    if (!audioEl) return;
-
     if (UNSUPPORTED_RECITER_IDENTIFIERS.has(selectedReciter)) {
       setMushafListening(false);
       setMushafListeningLoading(false);
@@ -603,20 +607,55 @@ function QuranAppContent() {
       return;
     }
 
-    setMushafListeningLoading(true);
     setMushafListeningError(null);
     setMushafHighlightedAyahNumber(ayah.number);
 
-    try {
-      const url = await fetchAyahAudioUrl(selectedReciter, ayah.number);
-      audioEl.src = url;
-      await audioEl.play();
-      setMushafListening(true);
-    } catch (err) {
-      setMushafListening(false);
-      setMushafListeningError(err instanceof Error ? err.message : 'تعذّر تشغيل تلاوة المصحف');
-    } finally {
-      setMushafListeningLoading(false);
+    // Choose active / inactive buffers
+    const activeEl   = mushafActiveIsFirstRef.current ? mushafAudioRef.current : mushafAudioRef2.current;
+    const inactiveEl = mushafActiveIsFirstRef.current ? mushafAudioRef2.current : mushafAudioRef.current;
+    if (!activeEl) return;
+
+    // If the inactive buffer already has this ayah preloaded, swap and play instantly
+    if (inactiveEl && mushafPrefetchedAyahRef.current === ayah.number) {
+      activeEl.pause();
+      mushafActiveIsFirstRef.current = !mushafActiveIsFirstRef.current;
+      mushafPrefetchedAyahRef.current = -1;
+      try {
+        await inactiveEl.play();
+        setMushafListening(true);
+      } catch {
+        // fallback: load fresh
+        inactiveEl.src = getAyahAudioUrl(selectedReciter, ayah.number);
+        await inactiveEl.play().catch(() => {});
+        setMushafListening(true);
+      }
+    } else {
+      // Not prefetched — load directly (no API round-trip: use CDN URL formula)
+      setMushafListeningLoading(true);
+      activeEl.pause();
+      activeEl.src = getAyahAudioUrl(selectedReciter, ayah.number);
+      try {
+        await activeEl.play();
+        setMushafListening(true);
+      } catch (err) {
+        setMushafListening(false);
+        setMushafListeningError(err instanceof Error ? err.message : 'تعذّر تشغيل تلاوة المصحف');
+      } finally {
+        setMushafListeningLoading(false);
+      }
+    }
+
+    // Prefetch the next ayah into the inactive buffer right away
+    const pageAyahs = pageVersesCache[mushafPageNumber] ?? [];
+    const idx = pageAyahs.findIndex((a) => a.number === ayah.number);
+    const nextAyah = pageAyahs[idx + 1];
+    if (nextAyah) {
+      const nowInactive = mushafActiveIsFirstRef.current ? mushafAudioRef2.current : mushafAudioRef.current;
+      if (nowInactive) {
+        nowInactive.src = getAyahAudioUrl(selectedReciter, nextAyah.number);
+        nowInactive.load();
+        mushafPrefetchedAyahRef.current = nextAyah.number;
+      }
     }
   };
 
@@ -1173,6 +1212,17 @@ function QuranAppContent() {
           setMushafListening(false);
           setMushafListeningLoading(false);
           setMushafListeningError('تعذّر تحميل الصوت لهذا القارئ');
+        }}
+        onEnded={() => {
+          handleMushafAudioEnded();
+        }}
+      />
+      <audio
+        ref={mushafAudioRef2}
+        className="hidden"
+        onError={() => {
+          // Prefetch buffer error — just clear the prefetch flag
+          mushafPrefetchedAyahRef.current = -1;
         }}
         onEnded={() => {
           handleMushafAudioEnded();
