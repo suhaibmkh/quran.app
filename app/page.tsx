@@ -13,6 +13,7 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import { VerseModal } from '@/components/VerseModal';
 import { MushafPage } from '@/components/MushafPage';
 import { VerseToolbar } from '@/components/VerseToolbar';
+import { TajweedGuide } from '@/components/TajweedGuide';
 import { TafsirModal } from '../src/components/TafsirModal';
 import type { MushafFontMode } from '@/components/SettingsModal';
 import type { Ayah, SurahSummary } from '@/lib/alQuranCloud';
@@ -848,6 +849,8 @@ function QuranAppContent() {
                 setSidebarOpen(false);
               }}
             />
+
+            <TajweedGuide isDark={isDark} />
 
             {/* Auto-play – interactive mode only */}
             {!readOnlyMushaf && (
