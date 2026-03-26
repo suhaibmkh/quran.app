@@ -13,6 +13,7 @@ interface OfflineGuideModalProps {
 
 const CACHED_PAGES_KEY = 'quran:cachedPages:v1';
 const PAGE_CACHE_PREFIX = 'quran:mushafPage:v1:';
+const SW_LAST_ERROR_KEY = 'quran:sw:lastError';
 
 function pageStorageKey(page: number): string {
   return `${PAGE_CACHE_PREFIX}${page}`;
@@ -30,6 +31,9 @@ type OfflineReadiness = {
   swSupported: boolean;
   swRegistered: boolean;
   swControlling: boolean;
+  swRegisterError: string | null;
+  swScriptReachable: boolean;
+  swScriptStatus: number | null;
   secureContext: boolean;
   localHostHttp: boolean;
   cacheStorageSupported: boolean;
@@ -100,6 +104,9 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
       swSupported: typeof navigator !== 'undefined' && 'serviceWorker' in navigator,
       swRegistered: false,
       swControlling: false,
+      swRegisterError: null,
+      swScriptReachable: false,
+      swScriptStatus: null,
       secureContext: typeof window !== 'undefined' ? window.isSecureContext : false,
       localHostHttp:
         typeof window !== 'undefined' &&
@@ -112,10 +119,33 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
     };
 
     try {
+      try {
+        const swRes = await fetch('/sw.js', { cache: 'no-store' });
+        result.swScriptReachable = swRes.ok;
+        result.swScriptStatus = swRes.status;
+      } catch {
+        result.swScriptReachable = false;
+        result.swScriptStatus = null;
+      }
+
       if (result.swSupported) {
+        // First, attempt registration explicitly from the readiness check.
+        try {
+          await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+          window.localStorage.removeItem(SW_LAST_ERROR_KEY);
+        } catch (error) {
+          result.swRegisterError = error instanceof Error ? error.message : 'فشل تسجيل Service Worker';
+          window.localStorage.setItem(SW_LAST_ERROR_KEY, result.swRegisterError);
+        }
+
         const registration = await navigator.serviceWorker.getRegistration();
         result.swRegistered = Boolean(registration);
         result.swControlling = Boolean(navigator.serviceWorker.controller);
+
+        if (!result.swRegisterError) {
+          const storedErr = window.localStorage.getItem(SW_LAST_ERROR_KEY);
+          if (storedErr) result.swRegisterError = storedErr;
+        }
       }
 
       if (result.cacheStorageSupported) {
@@ -219,8 +249,12 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
 
   const readinessHint = !readiness
     ? 'اضغط فحص الجاهزية لمعرفة حالة الأوف لاين'
+    : !readiness.swScriptReachable
+    ? `ملف sw.js غير متاح (${readiness.swScriptStatus ?? 'NO_RESPONSE'})`
     : !readiness.swSupported
     ? 'المتصفح لا يدعم Service Worker في هذه الجلسة'
+    : readiness.swRegisterError
+    ? `فشل تسجيل Service Worker: ${readiness.swRegisterError}`
     : !readiness.secureContext && !readiness.localHostHttp
     ? 'الرابط غير آمن (http). استخدم https أو localhost حتى يعمل الأوف لاين'
     : !readiness.swRegistered
@@ -337,6 +371,12 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
             {readiness && (
               <div className="space-y-2 text-xs">
                 <div className="flex items-center justify-between">
+                  <span style={{ color: textSub }}>وصول sw.js</span>
+                  <span className={readiness.swScriptReachable ? 'text-green-600' : 'text-red-500'}>
+                    {readiness.swScriptReachable ? `متاح (${readiness.swScriptStatus ?? 200})` : `غير متاح (${readiness.swScriptStatus ?? 'NO_RESPONSE'})`}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
                   <span style={{ color: textSub }}>دعم Service Worker</span>
                   <span className={readiness.swSupported ? 'text-green-600' : 'text-red-500'}>{readiness.swSupported ? 'نعم' : 'لا'}</span>
                 </div>
@@ -350,6 +390,11 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
                   <span style={{ color: textSub }}>تسجيل Service Worker</span>
                   <span className={readiness.swRegistered ? 'text-green-600' : 'text-red-500'}>{readiness.swRegistered ? 'مسجل' : 'غير مسجل'}</span>
                 </div>
+                {readiness.swRegisterError && (
+                  <div className="rounded-md px-2 py-1 text-[11px] bg-red-500/10 text-red-500">
+                    {readiness.swRegisterError}
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span style={{ color: textSub }}>تحكم Service Worker</span>
                   <span className={readiness.swControlling ? 'text-green-600' : 'text-amber-500'}>{readiness.swControlling ? 'متحكم' : 'بحاجة إعادة فتح'}</span>

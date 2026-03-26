@@ -2,6 +2,9 @@
 
 import { useEffect } from 'react';
 
+const SW_LAST_ERROR_KEY = 'quran:sw:lastError';
+const SW_LAST_STATUS_KEY = 'quran:sw:lastStatus';
+
 export function ServiceWorkerBootstrap() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -15,6 +18,8 @@ export function ServiceWorkerBootstrap() {
     const register = async () => {
       try {
         const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        window.localStorage.setItem(SW_LAST_STATUS_KEY, 'registered');
+        window.localStorage.removeItem(SW_LAST_ERROR_KEY);
 
         // Activate updated worker as soon as it's installed.
         if (reg.waiting) {
@@ -30,12 +35,28 @@ export function ServiceWorkerBootstrap() {
             }
           });
         });
-      } catch {
-        // Ignore registration errors; readiness check modal will show status.
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'unknown sw registration error';
+        window.localStorage.setItem(SW_LAST_STATUS_KEY, 'failed');
+        window.localStorage.setItem(SW_LAST_ERROR_KEY, message);
+        // Keep console log to simplify production debugging on device.
+        console.error('Service worker registration failed:', message);
       }
     };
 
+    const retry = () => {
+      void register();
+    };
+
     void register();
+
+    window.addEventListener('online', retry);
+    document.addEventListener('visibilitychange', retry);
+
+    return () => {
+      window.removeEventListener('online', retry);
+      document.removeEventListener('visibilitychange', retry);
+    };
   }, []);
 
   return null;
