@@ -43,6 +43,30 @@ const BOOKMARK_STORAGE_KEY = 'quran:lastBookmark:v1';
 const SELECTED_RECITER_KEY = 'quran:fixedReciter:v1';
 const SELECTED_TAFSIR_KEY = 'quran:fixedTafsir:v1';
 const MUSHAF_FONT_MODE_KEY = 'quran:mushafFontMode:v1';
+const PAGE_CACHE_PREFIX = 'quran:mushafPage:v1:';
+
+function pageStorageKey(page: number): string {
+  return `${PAGE_CACHE_PREFIX}${page}`;
+}
+
+function savePageToLocalStorage(page: number, ayahs: Ayah[]) {
+  try {
+    window.localStorage.setItem(pageStorageKey(page), JSON.stringify(ayahs));
+  } catch {
+    // ignore storage quota issues
+  }
+}
+
+function loadPageFromLocalStorage(page: number): Ayah[] | null {
+  try {
+    const raw = window.localStorage.getItem(pageStorageKey(page));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as Ayah[]) : null;
+  } catch {
+    return null;
+  }
+}
 
 const UNSUPPORTED_RECITER_IDENTIFIERS = new Set<string>([
   'ar.muhammadimran',
@@ -196,9 +220,16 @@ function QuranAppContent() {
       if (!ayahs.length) {
         throw new Error('تعذّر عرض الصفحة الحالية. حاول صفحة أخرى أو أعد المحاولة.');
       }
+      savePageToLocalStorage(page, ayahs);
       setPageVersesCache((prev) => ({ ...prev, [page]: ayahs }));
     } catch (err) {
-      setPageVersesError(err instanceof Error ? err.message : 'تعذّر تحميل صفحة المصحف');
+      const localAyahs = loadPageFromLocalStorage(page);
+      if (localAyahs && localAyahs.length > 0) {
+        setPageVersesCache((prev) => ({ ...prev, [page]: localAyahs }));
+        setPageVersesError(null);
+      } else {
+        setPageVersesError(err instanceof Error ? err.message : 'تعذّر تحميل صفحة المصحف');
+      }
     } finally {
       setPageVersesLoading(false);
     }

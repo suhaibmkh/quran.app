@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Wifi, WifiOff, CheckCircle, Download, Info } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
+import { fetchPageAyahs } from '@/lib/alQuranCloud';
 
 interface OfflineGuideModalProps {
   isOpen: boolean;
@@ -11,11 +12,26 @@ interface OfflineGuideModalProps {
 }
 
 const CACHED_PAGES_KEY = 'quran:cachedPages:v1';
+const PAGE_CACHE_PREFIX = 'quran:mushafPage:v1:';
+
+function pageStorageKey(page: number): string {
+  return `${PAGE_CACHE_PREFIX}${page}`;
+}
+
+function savePageToLocalStorage(page: number, ayahs: unknown) {
+  try {
+    localStorage.setItem(pageStorageKey(page), JSON.stringify(ayahs));
+  } catch {
+    // ignore storage quota issues
+  }
+}
 
 type OfflineReadiness = {
   swSupported: boolean;
   swRegistered: boolean;
   swControlling: boolean;
+  secureContext: boolean;
+  localHostHttp: boolean;
   cacheStorageSupported: boolean;
   hasOfflineFallback: boolean;
   hasStartUrlCache: boolean;
@@ -84,6 +100,11 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
       swSupported: typeof navigator !== 'undefined' && 'serviceWorker' in navigator,
       swRegistered: false,
       swControlling: false,
+      secureContext: typeof window !== 'undefined' ? window.isSecureContext : false,
+      localHostHttp:
+        typeof window !== 'undefined' &&
+        window.location.protocol === 'http:' &&
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'),
       cacheStorageSupported: typeof window !== 'undefined' && 'caches' in window,
       hasOfflineFallback: false,
       hasStartUrlCache: false,
@@ -159,7 +180,11 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
         continue;
       }
       try {
-        await fetch(`/api/quran/page/${page}/quran-uthmani`);
+        const ayahs = await fetchPageAyahs(page, 'quran-uthmani');
+        if (!Array.isArray(ayahs) || ayahs.length === 0) {
+          throw new Error('EMPTY_PAGE');
+        }
+        savePageToLocalStorage(page, ayahs);
         newCached.add(page);
         setProgress(p => p + 1);
       } catch {
@@ -184,6 +209,7 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
   const readinessOk = Boolean(
     readiness &&
     readiness.swSupported &&
+    (readiness.secureContext || readiness.localHostHttp) &&
     readiness.swRegistered &&
     readiness.swControlling &&
     readiness.hasOfflineFallback &&
@@ -195,6 +221,8 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
     ? 'اضغط فحص الجاهزية لمعرفة حالة الأوف لاين'
     : !readiness.swSupported
     ? 'المتصفح لا يدعم Service Worker في هذه الجلسة'
+    : !readiness.secureContext && !readiness.localHostHttp
+    ? 'الرابط غير آمن (http). استخدم https أو localhost حتى يعمل الأوف لاين'
     : !readiness.swRegistered
     ? 'افتح التطبيق وهو متصل ثم أعد تشغيله ليتم تسجيل Service Worker'
     : !readiness.swControlling
@@ -311,6 +339,12 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
                 <div className="flex items-center justify-between">
                   <span style={{ color: textSub }}>دعم Service Worker</span>
                   <span className={readiness.swSupported ? 'text-green-600' : 'text-red-500'}>{readiness.swSupported ? 'نعم' : 'لا'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span style={{ color: textSub }}>الرابط الآمن (https)</span>
+                  <span className={(readiness.secureContext || readiness.localHostHttp) ? 'text-green-600' : 'text-red-500'}>
+                    {(readiness.secureContext || readiness.localHostHttp) ? 'صحيح' : 'غير آمن'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span style={{ color: textSub }}>تسجيل Service Worker</span>
