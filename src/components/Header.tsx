@@ -63,8 +63,7 @@ export const Header = ({ currentChapter, onSettingsClick, readOnlyMushaf, onTogg
     };
   }, []);
 
-  const handleInstallClick = async () => {
-    if (deferredInstallPrompt) {
+  const handleInstallClick = async () => {    if (deferredInstallPrompt) {
       await deferredInstallPrompt.prompt();
       const choiceResult = await deferredInstallPrompt.userChoice;
       if (choiceResult.outcome === 'accepted') {
@@ -186,8 +185,7 @@ export const Header = ({ currentChapter, onSettingsClick, readOnlyMushaf, onTogg
           </button>
         </div>
 
-        {showIOSInstallHint && !isInstalled && (
-          <div className={`px-3 pb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`} dir="rtl">
+        {showIOSInstallHint && !isInstalled && (          <div className={`px-3 pb-2 ${isDark ? 'text-gray-200' : 'text-gray-700'}`} dir="rtl">
             <div className={`rounded-lg border p-2 text-xs leading-6 ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
               <div className="flex items-start justify-between gap-3">
                 <p>

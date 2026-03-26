@@ -18,6 +18,7 @@ import { TafsirModal } from '../src/components/TafsirModal';
 import type { MushafFontMode } from '@/components/SettingsModal';
 import type { Ayah, SurahSummary } from '@/lib/alQuranCloud';
 import { fetchAyahAudioUrl, getAyahAudioUrl, fetchJuzAyahs, fetchPageAyahs, fetchSurahAyahs, fetchSurahs } from '@/lib/alQuranCloud';
+import { toPng } from 'html-to-image';
 import { formatSurahLabel, normalizeSurahName } from '@/lib/surahName';
 
 const VERSES_PER_PAGE = 10;
@@ -105,6 +106,39 @@ function QuranAppContent() {
   // Touch swipe page navigation (mobile/tablet)
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
+
+  // Mushaf page capture
+  const mushafFrameRef = useRef<HTMLDivElement>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+
+  const handleShareMushafImage = async () => {
+    const el = mushafFrameRef.current;
+    if (!el || isCapturing) return;
+    setIsCapturing(true);
+    try {
+      // Capture twice: first call forces font load, second gives clean result
+      await toPng(el, { cacheBust: true, pixelRatio: 2 });
+      const dataUrl = await toPng(el, { cacheBust: true, pixelRatio: 2 });
+
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], `quran-page-${mushafPageNumber}.png`, { type: 'image/png' });
+
+      if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: `القرآن الكريم - صفحة ${mushafPageNumber}` });
+      } else {
+        // Fallback: auto-download
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `quran-page-${mushafPageNumber}.png`;
+        a.click();
+      }
+    } catch {
+      // user cancelled or error
+    } finally {
+      setIsCapturing(false);
+    }
+  };
 
   // Mushaf listening mode (page-by-page with ayah highlight)
   const mushafAudioRef = useRef<HTMLAudioElement | null>(null);  // active buffer
@@ -1014,6 +1048,40 @@ function QuranAppContent() {
                     ? `آخر موضع: صفحة ${bookmark.pageNumber}`
                     : 'حفظ'}
                 </button>
+
+                {/* Share as image */}
+                <button
+                  type="button"
+                  onClick={handleShareMushafImage}
+                  disabled={isCapturing || (pageVersesCache[mushafPageNumber]?.length ?? 0) === 0}
+                  className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors whitespace-nowrap flex items-center gap-1 ${
+                    isCapturing || (pageVersesCache[mushafPageNumber]?.length ?? 0) === 0
+                      ? isDark
+                        ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : isDark
+                      ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
+                  }`}
+                  title="مشاركة الصفحة كصورة"
+                >
+                  {isCapturing ? (
+                    <>
+                      <svg className="animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                      </svg>
+                      جاري...
+                    </>
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                        <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                      </svg>
+                      مشاركة
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           )}
@@ -1102,6 +1170,7 @@ function QuranAppContent() {
                   onTouchStart={handleMushafTouchStart}
                   onTouchEnd={handleMushafTouchEnd}
                   style={{ touchAction: 'pan-y' }}
+                  ref={mushafFrameRef}
                 >
                   <MushafPage
                     ayahs={pageVersesCache[mushafPageNumber] ?? []}
