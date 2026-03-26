@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Moon, Sun, BookOpen, Settings, Download } from 'lucide-react';
+import { Moon, Sun, BookOpen, Settings, Download, Wifi, WifiOff } from 'lucide-react';
 import { Menu, X } from 'lucide-react';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -18,15 +18,29 @@ interface HeaderProps {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   hideModeToggle?: boolean;
+  onOfflineGuideClick?: () => void;
 }
 
-export const Header = ({ currentChapter, onSettingsClick, readOnlyMushaf, onToggleMushaf, sidebarOpen, onToggleSidebar, hideModeToggle = false }: HeaderProps) => {
+export const Header = ({ currentChapter, onSettingsClick, readOnlyMushaf, onToggleMushaf, sidebarOpen, onToggleSidebar, hideModeToggle = false, onOfflineGuideClick }: HeaderProps) => {
   const { isDark, toggleTheme } = useTheme();
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOSDevice, setIsIOSDevice] = useState(false);
   const [isIOSSafari, setIsIOSSafari] = useState(false);
   const [showIOSInstallHint, setShowIOSInstallHint] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined') setIsOnline(navigator.onLine);
+    const up = () => setIsOnline(true);
+    const down = () => setIsOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => {
+      window.removeEventListener('online', up);
+      window.removeEventListener('offline', down);
+    };
+  }, []);
 
   useEffect(() => {
     const standalone =
@@ -157,6 +171,21 @@ export const Header = ({ currentChapter, onSettingsClick, readOnlyMushaf, onTogg
               <Download size={18} />
             </button>
           )}
+
+          {/* Offline guide */}
+          <button
+            onClick={onOfflineGuideClick}
+            className={`flex-shrink-0 p-2 rounded-lg transition-colors ${
+              !isOnline
+                ? 'bg-red-100 text-red-500 dark:bg-red-900/30'
+                : isDark
+                ? 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            title={isOnline ? 'القراءة أوف لاين' : 'أنت غير متصل بالإنترنت'}
+          >
+            {isOnline ? <Wifi size={18} /> : <WifiOff size={18} className="text-red-500" />}
+          </button>
 
           {/* Theme */}
           <button

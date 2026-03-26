@@ -15,6 +15,7 @@ import { MushafPage } from '@/components/MushafPage';
 import { VerseToolbar } from '@/components/VerseToolbar';
 import { TajweedGuide } from '@/components/TajweedGuide';
 import { TafsirModal } from '../src/components/TafsirModal';
+import { OfflineGuideModal } from '@/components/OfflineGuideModal';
 import type { MushafFontMode } from '@/components/SettingsModal';
 import type { Ayah, SurahSummary } from '@/lib/alQuranCloud';
 import { fetchAyahAudioUrl, getAyahAudioUrl, fetchJuzAyahs, fetchPageAyahs, fetchSurahAyahs, fetchSurahs } from '@/lib/alQuranCloud';
@@ -46,6 +47,11 @@ const MUSHAF_FONT_MODE_KEY = 'quran:mushafFontMode:v1';
 const UNSUPPORTED_RECITER_IDENTIFIERS = new Set<string>([
   'ar.muhammadimran',
 ]);
+
+function formatArabicPageTitle(pageNumber: number): string {
+  if (pageNumber === 1) return 'الصفحة الأولى';
+  return `الصفحة ${pageNumber}`;
+}
 
 function QuranAppContent() {
   const { isDark } = useTheme();
@@ -95,6 +101,7 @@ function QuranAppContent() {
   const [tafsirModalOpen, setTafsirModalOpen] = useState(false);
   const [tafsirAyah, setTafsirAyah] = useState<Ayah | null>(null);
   const [toolbarRect, setToolbarRect] = useState<DOMRect | null>(null);
+  const [offlineGuideOpen, setOfflineGuideOpen] = useState(false);
 
   // Auto-play (full surah)
   const autoAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -442,8 +449,8 @@ function QuranAppContent() {
         );
 
         return {
-          name: pageSurahName ? formatSurahLabel(pageSurahName) : `الصفحة ${mushafPageNumber}`,
-          englishName: `Page ${mushafPageNumber}`,
+          name: pageSurahName ? formatSurahLabel(pageSurahName) : formatArabicPageTitle(mushafPageNumber),
+          englishName: formatArabicPageTitle(mushafPageNumber),
         };
       }
 
@@ -755,6 +762,7 @@ function QuranAppContent() {
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
         hideModeToggle={true}
+        onOfflineGuideClick={() => setOfflineGuideOpen(true)}
       />
 
       {/* Settings Modal */}
@@ -770,6 +778,13 @@ function QuranAppContent() {
         readOnlyMushaf={readOnlyMushaf}
         mushafFontMode={mushafFontMode}
         onMushafFontModeChange={setMushafFontMode}
+      />
+
+      {/* Offline Guide Modal */}
+      <OfflineGuideModal
+        isOpen={offlineGuideOpen}
+        onClose={() => setOfflineGuideOpen(false)}
+        currentMushafPage={mushafPageNumber}
       />
 
       {/* Body: sidebar + main */}

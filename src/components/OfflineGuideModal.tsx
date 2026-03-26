@@ -1,0 +1,314 @@
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { X, Wifi, WifiOff, CheckCircle, Download, Info } from 'lucide-react';
+import { useTheme } from '@/context/ThemeContext';
+
+interface OfflineGuideModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentMushafPage: number;
+}
+
+const CACHED_PAGES_KEY = 'quran:cachedPages:v1';
+
+// Standard Madinah Mushaf juz page ranges
+const JUZ_PAGES: [number, number][] = [
+  [1, 21], [22, 41], [42, 61], [62, 81], [82, 101],
+  [102, 121], [122, 141], [142, 161], [162, 181], [182, 201],
+  [202, 221], [222, 241], [242, 261], [262, 281], [282, 301],
+  [302, 321], [322, 341], [342, 361], [362, 381], [382, 401],
+  [402, 421], [422, 441], [442, 461], [462, 481], [482, 501],
+  [502, 521], [522, 541], [542, 561], [562, 581], [582, 604],
+];
+
+const JUZ_AR = [
+  'الأوَّل', 'الثاني', 'الثالث', 'الرابع', 'الخامس',
+  'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر',
+  'الحادي عشر', 'الثاني عشر', 'الثالث عشر', 'الرابع عشر', 'الخامس عشر',
+  'السادس عشر', 'السابع عشر', 'الثامن عشر', 'التاسع عشر', 'العشرون',
+  'الحادي والعشرون', 'الثاني والعشرون', 'الثالث والعشرون', 'الرابع والعشرون', 'الخامس والعشرون',
+  'السادس والعشرون', 'السابع والعشرون', 'الثامن والعشرون', 'التاسع والعشرون', 'الثلاثون',
+];
+
+function getJuzIndex(page: number): number {
+  for (let i = 0; i < JUZ_PAGES.length; i++) {
+    const [s, e] = JUZ_PAGES[i];
+    if (page >= s && page <= e) return i;
+  }
+  return 0;
+}
+
+function loadCachedPages(): Set<number> {
+  try {
+    const raw = localStorage.getItem(CACHED_PAGES_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw) as number[]);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveCachedPages(pages: Set<number>) {
+  try {
+    localStorage.setItem(CACHED_PAGES_KEY, JSON.stringify([...pages]));
+  } catch { /* storage full */ }
+}
+
+export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: OfflineGuideModalProps) {
+  const { isDark } = useTheme();
+  const [isOnline, setIsOnline] = useState(true);
+  const [cachedPages, setCachedPages] = useState<Set<number>>(new Set());
+  const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadDone, setDownloadDone] = useState(false);
+  const [selectedJuzIndex, setSelectedJuzIndex] = useState(0);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setIsOnline(typeof navigator !== 'undefined' ? navigator.onLine : true);
+    setCachedPages(loadCachedPages());
+    setDownloadDone(false);
+    setDownloadError(null);
+    setSelectedJuzIndex(getJuzIndex(currentMushafPage));
+
+    const up = () => setIsOnline(true);
+    const down = () => setIsOnline(false);
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => {
+      window.removeEventListener('online', up);
+      window.removeEventListener('offline', down);
+    };
+  }, [isOpen, currentMushafPage]);
+
+  const [juzStart, juzEnd] = JUZ_PAGES[selectedJuzIndex];
+  const juzPageCount = juzEnd - juzStart + 1;
+  const cachedInJuz = [...cachedPages].filter(p => p >= juzStart && p <= juzEnd).length;
+  const juzComplete = cachedInJuz === juzPageCount;
+
+  const downloadRange = useCallback(async (start: number, end: number) => {
+    if (downloading) return;
+    setDownloading(true);
+    setDownloadDone(false);
+    setDownloadError(null);
+    const count = end - start + 1;
+    setTotal(count);
+    setProgress(0);
+    const newCached = new Set(cachedPages);
+    for (let page = start; page <= end; page++) {
+      if (newCached.has(page)) {
+        setProgress(p => p + 1);
+        continue;
+      }
+      try {
+        await fetch(`/api/quran/page/${page}/quran-uthmani`);
+        newCached.add(page);
+        setProgress(p => p + 1);
+      } catch {
+        setDownloadError(`فشل تحميل الصفحة ${page} — تحقق من الاتصال`);
+        break;
+      }
+    }
+    setCachedPages(new Set(newCached));
+    saveCachedPages(newCached);
+    setDownloading(false);
+    setDownloadDone(true);
+  }, [downloading, cachedPages]);
+
+  if (!isOpen) return null;
+
+  const bg = isDark ? '#111827' : '#ffffff';
+  const borderColor = isDark ? '#374151' : '#e5e7eb';
+  const textMain = isDark ? '#f3f4f6' : '#1f2937';
+  const textSub = isDark ? '#9ca3af' : '#6b7280';
+  const cardBg = isDark ? '#1f2937' : '#f9fafb';
+  const totalCached = cachedPages.size;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4"
+      style={{ background: 'rgba(0,0,0,0.55)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
+        style={{ background: bg, border: `1px solid ${borderColor}` }}
+        dir="rtl"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${borderColor}` }}>
+          <div className="flex items-center gap-2">
+            {isOnline
+              ? <Wifi size={20} className="text-quran-green" />
+              : <WifiOff size={20} className="text-red-500" />
+            }
+            <h2 className="text-base font-bold" style={{ color: textMain }}>القراءة بدون إنترنت</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded transition-colors"
+            style={{ color: textSub }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4 text-sm overflow-y-auto max-h-[80vh]">
+          {/* Connection status pill */}
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
+            isOnline ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-500'
+          }`}>
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isOnline ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
+            {isOnline ? 'متصل بالإنترنت — يمكنك تحميل البيانات الآن' : 'غير متصل — الصفحات المحفوظة فقط متاحة'}
+          </div>
+
+          {/* How it works */}
+          <div className="rounded-xl p-4 space-y-3" style={{ background: cardBg, border: `1px solid ${borderColor}` }}>
+            <p className="font-bold" style={{ color: textMain }}>كيف تعمل القراءة أوف لاين؟</p>
+            <div className="space-y-2.5">
+              {[
+                { n: '١', t: 'تأكد من اتصالك بالإنترنت' },
+                { n: '٢', t: 'تصفّح الصفحات التي تريد قراءتها وهي ستُحفظ تلقائياً' },
+                { n: '٣', t: 'أو اضغط "تحميل الجزء" لحفظ جزء كامل دفعةً واحدة' },
+                { n: '٤', t: 'وبعدها افتح التطبيق بدون إنترنت وستعمل الصفحات المحفوظة' },
+              ].map(({ n, t }) => (
+                <div key={n} className="flex items-start gap-3">
+                  <span className="w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full bg-quran-green text-white text-xs font-bold mt-0.5">{n}</span>
+                  <span className="leading-5" style={{ color: textSub }}>{t}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* PWA notice */}
+          <div className="flex gap-2 px-3 py-2.5 rounded-lg" style={{ background: isDark ? 'rgba(201,168,76,0.08)' : 'rgba(201,168,76,0.12)', border: `1px solid rgba(201,168,76,0.25)` }}>
+            <Info size={15} className="flex-shrink-0 mt-0.5 text-yellow-600" />
+            <p className="text-xs leading-5" style={{ color: isDark ? '#d4b96a' : '#92700a' }}>
+              للحصول على تجربة أوف لاين كاملة، ثبّت التطبيق على جهازك (PWA). ابحث عن زر "تثبيت" أو "إضافة إلى الشاشة الرئيسية" في متصفحك.
+            </p>
+          </div>
+
+          {/* Summary */}
+          <div className="rounded-xl p-3" style={{ background: cardBg, border: `1px solid ${borderColor}` }}>
+            <p className="text-xs" style={{ color: textSub }}>
+              إجمالي الصفحات المحفوظة:{' '}
+              <span className="font-bold text-quran-green">{totalCached}</span>
+              {' '}من{' '}
+              <span className="font-semibold" style={{ color: textMain }}>604</span>
+            </p>
+            {totalCached > 0 && (
+              <div className="mt-2 h-1.5 rounded-full" style={{ background: isDark ? '#374151' : '#e5e7eb' }}>
+                <div
+                  className="h-1.5 rounded-full bg-quran-green transition-all"
+                  style={{ width: `${Math.round((totalCached / 604) * 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Juz selector + download */}
+          <div className="rounded-xl p-4 space-y-3" style={{ background: cardBg, border: `1px solid ${borderColor}` }}>
+            <p className="font-bold" style={{ color: textMain }}>تحميل جزء كامل للقراءة أوف لاين</p>
+
+            {/* Juz picker */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs flex-shrink-0" style={{ color: textSub }}>اختر الجزء:</label>
+              <select
+                value={selectedJuzIndex}
+                onChange={e => setSelectedJuzIndex(Number(e.target.value))}
+                disabled={downloading}
+                className="flex-1 rounded-lg px-2 py-1.5 text-sm outline-none"
+                style={{
+                  background: isDark ? '#111827' : '#ffffff',
+                  border: `1px solid ${borderColor}`,
+                  color: textMain,
+                }}
+              >
+                {JUZ_AR.map((name, i) => (
+                  <option key={i} value={i}>
+                    الجزء {name} (ص {JUZ_PAGES[i][0]}–{JUZ_PAGES[i][1]})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Progress of selected juz */}
+            <div>
+              <div className="flex justify-between text-xs mb-1" style={{ color: textSub }}>
+                <span>{juzComplete ? '✓ محفوظ بالكامل' : `${cachedInJuz} من ${juzPageCount} صفحة محفوظة`}</span>
+                <span>{Math.round((cachedInJuz / juzPageCount) * 100)}%</span>
+              </div>
+              <div className="h-2 rounded-full" style={{ background: isDark ? '#374151' : '#e5e7eb' }}>
+                <div
+                  className="h-2 rounded-full bg-quran-green transition-all"
+                  style={{ width: `${Math.round((cachedInJuz / juzPageCount) * 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Download progress bar */}
+            {downloading && (
+              <div>
+                <div className="flex justify-between text-xs mb-1" style={{ color: textSub }}>
+                  <span>جاري التحميل…</span>
+                  <span>{progress}/{total}</span>
+                </div>
+                <div className="h-2 rounded-full" style={{ background: isDark ? '#374151' : '#e5e7eb' }}>
+                  <div
+                    className="h-2 rounded-full bg-blue-500 transition-all"
+                    style={{ width: `${total > 0 ? Math.round((progress / total) * 100) : 0}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {downloadDone && !downloading && !downloadError && (
+              <div className="flex items-center gap-2 text-xs text-green-600">
+                <CheckCircle size={14} />
+                تم الحفظ بنجاح — يمكنك قراءة هذا الجزء بدون إنترنت
+              </div>
+            )}
+
+            {downloadError && (
+              <p className="text-xs text-red-500">{downloadError}</p>
+            )}
+
+            <button
+              type="button"
+              disabled={!isOnline || downloading || juzComplete}
+              onClick={() => downloadRange(juzStart, juzEnd)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+              style={{
+                background: (!isOnline || downloading || juzComplete) ? (isDark ? '#374151' : '#e5e7eb') : '#16a34a',
+                color: (!isOnline || downloading || juzComplete) ? textSub : '#ffffff',
+                cursor: (!isOnline || downloading || juzComplete) ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {downloading && (
+                <svg className="animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                </svg>
+              )}
+              {juzComplete ? (
+                <><CheckCircle size={16} /> الجزء محفوظ بالفعل</>
+              ) : downloading ? (
+                `جاري تحميل الصفحة ${progress + 1} من ${total}…`
+              ) : !isOnline ? (
+                'لا يوجد اتصال بالإنترنت'
+              ) : (
+                <><Download size={16} /> تحميل الجزء ({juzPageCount} صفحة)</>
+              )}
+            </button>
+          </div>
+
+          <p className="text-xs text-center" style={{ color: textSub }}>
+            ملاحظة: التلاوة الصوتية تحتاج إنترنت دائماً — النصوص القرآنية فقط تعمل أوف لاين
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
