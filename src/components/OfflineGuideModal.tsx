@@ -12,6 +12,16 @@ interface OfflineGuideModalProps {
 
 const CACHED_PAGES_KEY = 'quran:cachedPages:v1';
 
+type OfflineReadiness = {
+  swSupported: boolean;
+  swRegistered: boolean;
+  swControlling: boolean;
+  cacheStorageSupported: boolean;
+  hasOfflineFallback: boolean;
+  hasStartUrlCache: boolean;
+  hasQuranApiCache: boolean;
+};
+
 // Standard Madinah Mushaf juz page ranges
 const JUZ_PAGES: [number, number][] = [
   [1, 21], [22, 41], [42, 61], [62, 81], [82, 101],
@@ -65,6 +75,50 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadDone, setDownloadDone] = useState(false);
   const [selectedJuzIndex, setSelectedJuzIndex] = useState(0);
+  const [checkingReadiness, setCheckingReadiness] = useState(false);
+  const [readiness, setReadiness] = useState<OfflineReadiness | null>(null);
+
+  const runReadinessCheck = useCallback(async () => {
+    setCheckingReadiness(true);
+    const result: OfflineReadiness = {
+      swSupported: typeof navigator !== 'undefined' && 'serviceWorker' in navigator,
+      swRegistered: false,
+      swControlling: false,
+      cacheStorageSupported: typeof window !== 'undefined' && 'caches' in window,
+      hasOfflineFallback: false,
+      hasStartUrlCache: false,
+      hasQuranApiCache: false,
+    };
+
+    try {
+      if (result.swSupported) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        result.swRegistered = Boolean(registration);
+        result.swControlling = Boolean(navigator.serviceWorker.controller);
+      }
+
+      if (result.cacheStorageSupported) {
+        const cacheKeys = await caches.keys();
+        const offlineUrl = new URL('/offline', window.location.origin).toString();
+        const homeUrl = new URL('/', window.location.origin).toString();
+
+        for (const key of cacheKeys) {
+          const cache = await caches.open(key);
+          const offlineHit = await cache.match(offlineUrl, { ignoreSearch: true });
+          const homeHit = await cache.match(homeUrl, { ignoreSearch: true });
+
+          if (offlineHit) result.hasOfflineFallback = true;
+          if (homeHit || key.includes('start-url')) result.hasStartUrlCache = true;
+          if (key.includes('quran-api-data')) result.hasQuranApiCache = true;
+        }
+      }
+    } catch {
+      // ignore readiness check failures and show best-effort status
+    } finally {
+      setReadiness(result);
+      setCheckingReadiness(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -73,6 +127,7 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
     setDownloadDone(false);
     setDownloadError(null);
     setSelectedJuzIndex(getJuzIndex(currentMushafPage));
+    void runReadinessCheck();
 
     const up = () => setIsOnline(true);
     const down = () => setIsOnline(false);
@@ -82,7 +137,7 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
       window.removeEventListener('online', up);
       window.removeEventListener('offline', down);
     };
-  }, [isOpen, currentMushafPage]);
+  }, [isOpen, currentMushafPage, runReadinessCheck]);
 
   const [juzStart, juzEnd] = JUZ_PAGES[selectedJuzIndex];
   const juzPageCount = juzEnd - juzStart + 1;
@@ -126,6 +181,29 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
   const textSub = isDark ? '#9ca3af' : '#6b7280';
   const cardBg = isDark ? '#1f2937' : '#f9fafb';
   const totalCached = cachedPages.size;
+  const readinessOk = Boolean(
+    readiness &&
+    readiness.swSupported &&
+    readiness.swRegistered &&
+    readiness.swControlling &&
+    readiness.hasOfflineFallback &&
+    readiness.hasStartUrlCache &&
+    (readiness.hasQuranApiCache || totalCached > 0)
+  );
+
+  const readinessHint = !readiness
+    ? 'اضغط فحص الجاهزية لمعرفة حالة الأوف لاين'
+    : !readiness.swSupported
+    ? 'المتصفح لا يدعم Service Worker في هذه الجلسة'
+    : !readiness.swRegistered
+    ? 'افتح التطبيق وهو متصل ثم أعد تشغيله ليتم تسجيل Service Worker'
+    : !readiness.swControlling
+    ? 'أغلق التطبيق وافتحه مرة أخرى ليصبح Service Worker متحكما'
+    : !readiness.hasOfflineFallback
+    ? 'لم يتم حفظ صفحة /offline بعد. افتح التطبيق أونلاين مرة أخرى'
+    : totalCached === 0
+    ? 'حمّل جزءا واحدا على الأقل قبل فصل الإنترنت'
+    : 'جاهز غالبا للعمل أوف لاين';
 
   return (
     <div
@@ -207,6 +285,55 @@ export function OfflineGuideModal({ isOpen, onClose, currentMushafPage }: Offlin
                 />
               </div>
             )}
+          </div>
+
+          {/* Offline readiness check */}
+          <div className="rounded-xl p-4 space-y-3" style={{ background: cardBg, border: `1px solid ${borderColor}` }}>
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-bold" style={{ color: textMain }}>فحص جاهزية الأوف لاين</p>
+              <button
+                type="button"
+                onClick={() => void runReadinessCheck()}
+                disabled={checkingReadiness}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                style={{
+                  background: checkingReadiness ? (isDark ? '#374151' : '#e5e7eb') : '#2563eb',
+                  color: checkingReadiness ? textSub : '#ffffff',
+                  cursor: checkingReadiness ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {checkingReadiness ? 'جاري الفحص...' : 'فحص الآن'}
+              </button>
+            </div>
+
+            {readiness && (
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span style={{ color: textSub }}>دعم Service Worker</span>
+                  <span className={readiness.swSupported ? 'text-green-600' : 'text-red-500'}>{readiness.swSupported ? 'نعم' : 'لا'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span style={{ color: textSub }}>تسجيل Service Worker</span>
+                  <span className={readiness.swRegistered ? 'text-green-600' : 'text-red-500'}>{readiness.swRegistered ? 'مسجل' : 'غير مسجل'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span style={{ color: textSub }}>تحكم Service Worker</span>
+                  <span className={readiness.swControlling ? 'text-green-600' : 'text-amber-500'}>{readiness.swControlling ? 'متحكم' : 'بحاجة إعادة فتح'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span style={{ color: textSub }}>وجود صفحة الأوف لاين</span>
+                  <span className={readiness.hasOfflineFallback ? 'text-green-600' : 'text-red-500'}>{readiness.hasOfflineFallback ? 'محفوظة' : 'غير محفوظة'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span style={{ color: textSub }}>بيانات صفحات القرآن</span>
+                  <span className={(readiness.hasQuranApiCache || totalCached > 0) ? 'text-green-600' : 'text-red-500'}>{(readiness.hasQuranApiCache || totalCached > 0) ? 'متوفرة' : 'غير متوفرة'}</span>
+                </div>
+              </div>
+            )}
+
+            <div className={`rounded-lg px-3 py-2 text-xs ${readinessOk ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'}`}>
+              {readinessHint}
+            </div>
           </div>
 
           {/* Juz selector + download */}

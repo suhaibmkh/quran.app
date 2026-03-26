@@ -469,8 +469,28 @@ body {
   .mushaf-frame::after  { inset: 5px; border-radius: 8px; }
   .mushaf-inner { padding: 18px 14px 16px; }
   .mushaf-corner { width: 44px; height: 44px; }
-  .mushaf-top-meta { grid-template-columns: 1fr; gap: 6px; margin-bottom: 12px; }
-  .mushaf-meta-pill, .mushaf-meta-pill.end { justify-self: center; }
+  .mushaf-top-meta {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+    direction: rtl;
+  }
+  .mushaf-meta-pill {
+    justify-self: start;
+    min-width: 0;
+    width: max-content;
+    max-width: 48%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mushaf-meta-pill.end {
+    justify-self: end;
+    min-width: 0;
+    width: max-content;
+    max-width: 48%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .mushaf-header-ornament { display: none; }
   .mushaf-surah-banner { padding: 10px 44px; }
   .mushaf-verse-num { width: 26px; height: 26px; font-size: 11px; margin: 0 3px; }
