@@ -43,14 +43,28 @@ export function ServiceWorkerBootstrap() {
           const didReload = window.sessionStorage.getItem(SW_RELOAD_ONCE_KEY) === '1';
           if (!didReload) {
             window.sessionStorage.setItem(SW_RELOAD_ONCE_KEY, '1');
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-              window.location.reload();
-            }, { once: true });
+            navigator.serviceWorker.addEventListener(
+              'controllerchange',
+              () => {
+                window.location.reload();
+              },
+              { once: true }
+            );
 
             // Give the newly installed worker a chance to take control now.
             if (reg.waiting) {
               reg.waiting.postMessage({ type: 'SKIP_WAITING' });
             }
+
+            // If there is no waiting worker, force one navigation so active SW can control the page.
+            window.location.reload();
+          }
+        } else {
+          // Prime offline route once SW is controlling so fallback can be served offline.
+          try {
+            await fetch('/offline', { cache: 'reload' });
+          } catch {
+            // ignore prefetch failures
           }
         }
       } catch (error) {
