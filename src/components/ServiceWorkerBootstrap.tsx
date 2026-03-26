@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 
 const SW_LAST_ERROR_KEY = 'quran:sw:lastError';
 const SW_LAST_STATUS_KEY = 'quran:sw:lastStatus';
+const SW_RELOAD_ONCE_KEY = 'quran:sw:reloadedOnce';
 
 export function ServiceWorkerBootstrap() {
   useEffect(() => {
@@ -35,6 +36,23 @@ export function ServiceWorkerBootstrap() {
             }
           });
         });
+
+        // Ensure this page is controlled without requiring manual reopen.
+        await navigator.serviceWorker.ready;
+        if (!navigator.serviceWorker.controller) {
+          const didReload = window.sessionStorage.getItem(SW_RELOAD_ONCE_KEY) === '1';
+          if (!didReload) {
+            window.sessionStorage.setItem(SW_RELOAD_ONCE_KEY, '1');
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              window.location.reload();
+            }, { once: true });
+
+            // Give the newly installed worker a chance to take control now.
+            if (reg.waiting) {
+              reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+          }
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'unknown sw registration error';
         window.localStorage.setItem(SW_LAST_STATUS_KEY, 'failed');
