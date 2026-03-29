@@ -29,6 +29,13 @@ export type AyahSearchResult = {
 
 const API_BASE = '/api/quran';
 
+const RECITER_PREFERRED_BITRATE: Record<string, number> = {
+  // This reciter is served at 64kbps on cdn.islamic.network.
+  'ar.abdulsamad': 64,
+  // This reciter is served at 192kbps on cdn.islamic.network.
+  'ar.abdurrahmaansudais': 192,
+};
+
 const quranEditionAyahsCache: Record<string, Promise<Ayah[]>> = {};
 
 function normalizeArabicForSearch(input: string): string {
@@ -183,8 +190,8 @@ export async function fetchPageAyahs(pageNumber: number, edition: string = 'qura
 }
 
 export function getAyahAudioUrl(reciterIdentifier: string, globalAyahNumber: number) {
-  // Matches the audio URL returned by alquran.cloud
-  return `https://cdn.islamic.network/quran/audio/128/${reciterIdentifier}/${globalAyahNumber}.mp3`;
+  const bitrate = RECITER_PREFERRED_BITRATE[reciterIdentifier] ?? 128;
+  return `https://cdn.islamic.network/quran/audio/${bitrate}/${reciterIdentifier}/${globalAyahNumber}.mp3`;
 }
 
 export async function fetchAyahAudioUrl(
